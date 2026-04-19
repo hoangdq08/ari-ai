@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kế Hoạch Triển Khai: Nông Trí AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text-main: #1e293b;
+            --text-light: #475569;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: var(--text-main);
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 50px;
+            background: var(--surface);
+            border-radius: 16px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+        }
+
+        .header {
+            text-align: center;
+            padding-bottom: 30px;
+            margin-bottom: 40px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        h1 {
+            color: var(--primary-dark);
+            font-size: 2.4rem;
+            margin-bottom: 12px;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            font-size: 1.15rem;
+            color: var(--text-light);
+            font-weight: 500;
+        }
+
+        h2 {
+            color: var(--primary-dark);
+            margin-top: 50px;
+            margin-bottom: 25px;
+            font-size: 1.6rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 10px;
+        }
+
+        p {
+            font-size: 1.05rem;
+            color: var(--text-light);
+        }
+
+        /* Hero Text */
+        .hero {
+            background: #eff6ff;
+            border-left: 4px solid var(--primary);
+            padding: 25px 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+            color: #1e3a8a;
+        }
+
+        /* Mermaid Container */
+        .mermaid-container {
+            width: 100%;
+            overflow-x: auto;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 30px;
+            margin: 25px 0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+            margin-top: 25px;
+        }
+
+        .feature-box {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 25px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .feature-box:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.08);
+            border-color: #cbd5e1;
+        }
+
+        .feature-box h3 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .feature-box p {
+            margin: 0;
+            line-height: 1.6;
+            flex-grow: 1;
+        }
+
+        .accent-text {
+            font-weight: 600;
+            color: var(--text-main);
+        }
+    </style>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            fontFamily: 'Inter, sans-serif'
+        });
+    </script>
+</head>
+
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <h1>🌾 Đề xuất Hệ thống Nông Trí AI</h1>
+            <div class="subtitle">Trợ lý Cố vấn Nông nghiệp Đa phương tiện | Môn học: Tư duy Trí tuệ Nhân tạo</div>
+        </div>
+
+        <!-- SECTION 1 -->
+        <div class="hero">
+            <strong>Tóm tắt Giải pháp:</strong> Một ứng dụng (Mobile-First) cho phép nông dân giao tiếp với Trợ lý AI
+            bằng
+            <strong>Giọng nói (Voice)</strong> hoặc <strong>Hình ảnh (Chụp lá cây bị bệnh)</strong> thay vì gõ phím.
+            Cốt lõi sử dụng kiến trúc <strong>RAG (Retrieval-Augmented Generation)</strong> để trích xuất dữ liệu từ các
+            tài liệu khuyến nông chính thống, đảm bảo không bịa đặt thông tin.
+        </div>
+
+        <!-- SECTION 2 -->
+        <h2>1️⃣ Kiến trúc Tổng thể (Architecture Flow)</h2>
+        <p>Sơ đồ kiến trúc thể hiện luồng chạy dữ liệu từ Nông dân (Mobile/Web) tới Engine AI. Phân tách rõ các lớp Tiền
+            xử lý (Robustness) và Lõi AI (Reliability) để dễ dàng báo cáo.</p>
+
+        <div class="mermaid-container">
+            <div class="mermaid">
+                flowchart LR
+                classDef userLayer fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a,rx:10,ry:10;
+                classDef securityLayer fill:#fef2f2,stroke:#ef4444,stroke-width:2px,color:#991b1b,rx:10,ry:10;
+                classDef coreLayer fill:#f0fdf4,stroke:#22c55e,stroke-width:2px,color:#166534,rx:10,ry:10;
+                classDef dbLayer fill:#f5f3ff,stroke:#8b5cf6,stroke-width:2px,color:#5b21b6,rx:10,ry:10;
+                classDef orchestrator fill:#fff7ed,stroke:#f97316,stroke-width:2px,color:#9a3412,rx:10,ry:10;
+
+                subgraph Client [🧑‍🌾 GIAO DIỆN NGƯỜI DÙNG]
+                UI["📱 Web / App Mobile"]:::userLayer
+                Voice["🎙️ Ghi âm Giọng Nói"]:::userLayer
+                Cam["📸 Chụp Mẫu Bệnh"]:::userLayer
+                end
+
+                subgraph Robustness [🛡️ LỚP KIỂM DUYỆT Đoạn 1]
+                STT["Phân Tích & Dịch Giọng<br>(Speech-to-Text)"]:::securityLayer
+                CleanImg["Kiểm Tra Chất Lượng Ảnh<br>(Bộ Lọc Nhiễu)"]:::securityLayer
+                PromptGuard["Kiểm Duyệt Nội Dung<br>(Chống Hack/Jailbreak)"]:::securityLayer
+                Reject("🛑 Báo Lỗi / Từ Chối"):::securityLayer
+                end
+
+                subgraph Core [🧠 LÕI XỬ LÝ TRÍ TUỆ NHÂN TẠO]
+                Orchestrator{"ĐIỀU PHỐI AI Router"}:::orchestrator
+                RAG["🔍 RAG Engine<br>(Truy tìm ngữ cảnh)"]:::coreLayer
+                LLM["🤖 Logic Chẩn Đoán<br>(Vision & LLM)"]:::coreLayer
+                end
+
+                subgraph DB [📚 CƠ SỞ TRI THỨC]
+                Docs["Tài Liệu Nông Nghiệp<br>Khuyến Nông VN"]:::dbLayer
+                VectorDB[("Vector Database<br>(Pinecone/Chroma)")]:::dbLayer
+                end
+
+                UI -->|"Nhập Text"| PromptGuard
+                Voice -->|"File Audio"| STT
+                Cam -->|"File Ảnh"| CleanImg
+
+                STT -->|"Text"| PromptGuard
+                CleanImg -->|"Ảnh Đã Lọc"| PromptGuard
+
+                PromptGuard -->|"Hợp Lệ"| Orchestrator
+                PromptGuard -.->|"Vi Phạm"| Reject
+
+                Docs -.->|"Nhúng Data<br>(Embedding)"| VectorDB
+                Orchestrator -->|"Câu Hỏi"| RAG
+                RAG -->|"Truy vấn"| VectorDB
+                VectorDB -->|"Ngữ cảnh"| RAG
+
+                RAG -->|"Gửi Ngữ Cảnh Chính Xác"| LLM
+                Orchestrator -->|"Gửi Ảnh Mẫu Bệnh"| LLM
+
+                LLM == "Trả Lời Khuyên & Nguồn Bệnh" ==> UI
+            </div>
+        </div>
+
+        <!-- SECTION 3 -->
+        <h2>2️⃣ Phân Tích 5 Trục AI (Báo Cáo Điểm)</h2>
+        <div class="grid">
+            <div class="feature-box" style="border-left: 4px solid #ef4444;">
+                <h3 style="color: #b91c1c;">🛡️ Robustness (Bền bỉ / Chống lỗi)</h3>
+                <p>Khả năng từ chối lệnh rác (Prompt Injection) khi thao túng hệ thống qua <span
+                        class="accent-text">PromptGuard</span>. Yêu cầu người dùng chụp lại nếu ảnh mờ rung tay ngoài
+                    đồng, tránh AI đoán bệnh bậy bạ lấy lệ dẫn đến sai lệch hệ thống.</p>
+            </div>
+
+            <div class="feature-box" style="border-left: 4px solid #10b981;">
+                <h3 style="color: #047857;">📈 Reliability (Độ tin cậy)</h3>
+                <p>Khắc phục điểm yếu "ảo giác" (hallucination) của AI thông thường bằng kiến trúc <span
+                        class="accent-text">RAG</span>. Hệ thống không bịa kiến thức mà chỉ trích xuất từ Cẩm nang bảo
+                    vệ thực vật chính thống của Bộ NN&PTNT.</p>
+            </div>
+
+            <div class="feature-box" style="border-left: 4px solid #8b5cf6;">
+                <h3 style="color: #6d28d9;">🔍 Explainability (Minh bạch)</h3>
+                <p>Mỗi khi hệ thống chẩn đoán "bệnh đạo ôn" qua hình ảnh, LLM bắt buộc kết xuất chuỗi thông báo giải
+                    thích vì sao, đi kèm nguồn gốc. VD: <span class="accent-text">"...dựa trên đốm xám mắt én (Căn cứ
+                        Cẩm Nang Lúa Gạo - Tr.15)"</span>.</p>
+            </div>
+
+            <div class="feature-box" style="border-left: 4px solid #ec4899;">
+                <h3 style="color: #be185d;">⚖️ Bias & Fairness (Công bằng)</h3>
+                <p>Chống thiên vị học thức và vùng miền. Người mù chữ, kém công nghệ hoặc nói phương ngữ địa phương trọ
+                    trẹ vẫn dùng được thông qua hệ thống dịch ngôn ngữ <span class="accent-text">Voice-to-Text đa vùng
+                        miền</span>.</p>
+            </div>
+
+            <div class="feature-box" style="border-left: 4px solid #3b82f6;">
+                <h3 style="color: #1d4ed8;">🤝 Social Impact (Tác động xã hội)</h3>
+                <p>Không dùng AI giám sát đắt đỏ cho tài phiệt làm farm, dự án tập trung làm App <span
+                        class="accent-text">cứu sinh kế cho nông dân nhỏ lẻ</span>, thay thế chuyên gia tư vấn tại chỗ
+                    với chi phí 0đ, đặc biệt hữu ích cho đồng bào khó khăn.</p>
+            </div>
+        </div>
+
+        <!-- SECTION 4 -->
+        <h2>3️⃣ Tech Stack Khuyến Nghị</h2>
+        <div class="grid">
+            <div class="feature-box" style="border-left: 4px solid #3b82f6;">
+                <h3 style="color: #1d4ed8;">🚀 Frontend: ReactJS / Flutter</h3>
+                <p><span class="accent-text">Công dụng:</span> Xây dựng giao diện cho nông dân (Mobile Web / Native
+                    App). Tối ưu hóa UI/UX với các nút bấm "Ghi âm" và "Chụp nấm bệnh" siêu to để người lớn tuổi dễ thao
+                    tác ngoài nắng gắt.</p>
+            </div>
+
+            <div class="feature-box" style="border-left: 4px solid #f59e0b;">
+                <h3 style="color: #b45309;">⚙️ AI Backend: Python (FastAPI/LangChain)</h3>
+                <p><span class="accent-text">Công dụng:</span> Nhạc trưởng Orchestrator xử lý trung tâm. Chứa khối logic
+                    tiền xử lý lọc hình mờ, module chặn Prompt Hack (Robustness), gọi Database và nối các Model AI lại
+                    với nhau.</p>
+            </div>
+
+            <div class="feature-box" style="border-left: 4px solid #8b5cf6;">
+                <h3 style="color: #6d28d9;">🗄️ Vector DB: Pinecone / ChromaDB</h3>
+                <p><span class="accent-text">Công dụng:</span> Chứa hàng vạn trang giáo trình nông nghiệp đã được số hóa
+                    dưới dạng Vector (Embedding). Giúp AI quét và truy tìm chính xác đoạn văn chứa câu trả lời chỉ trong
+                    một tích tắc (Trục Reliability).</p>
+            </div>
+
+            <div class="feature-box" style="border-left: 4px solid #10b981;">
+                <h3 style="color: #047857;">🧠 Lõi AI Lớn: Gemini 1.5 PRO / OpenAI</h3>
+                <p><span class="accent-text">Công dụng:</span> LLM Reasoning Model siêu việt. Nhận input Hình ảnh + Text
+                    để phân tích bệnh học (Vision AI). Sinh câu tư vấn gần gũi như một người kỹ sư nông nghiệp dựa vững
+                    chắc vào context lấy từ RAG.</p>
+            </div>
+
+            <div class="feature-box" style="border-left: 4px solid #ec4899;">
+                <h3 style="color: #be185d;">🎙️ AI Giọng nói: Whisper / FPT.AI</h3>
+                <p><span class="accent-text">Công dụng:</span> Tự động phiên dịch giọng nói (Bắc-Trung-Nam) thành Text.
+                    Đây là yếu tố sống còn để đảm bảo sự bằng đẳng (Bias/Fairness) cho dự án ở môi trường nông thôn Việt
+                    Nam.</p>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
