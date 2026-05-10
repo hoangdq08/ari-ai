@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   frontend:
     build:
@@ -14,18 +12,18 @@ services:
     networks:
       - argiai_net
 
-  # backend:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   container_name: argiai_backend
-  #   ports:
-  #     - "8000:8000"
-  #   restart: unless-stopped
-  #   environment:
-  #     - ENVIRONMENT=production
-  #   networks:
-  #     - argiai_net
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: argiai_backend
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    networks:
+      - argiai_net
 
 networks:
   argiai_net:
