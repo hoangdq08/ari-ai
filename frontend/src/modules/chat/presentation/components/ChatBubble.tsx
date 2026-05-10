@@ -5,9 +5,10 @@ interface ChatBubbleProps {
   role: "user" | "ai";
   content: string;
   citation?: string;
+  imageUrl?: string;
 }
 
-export function ChatBubble({ role, content, citation }: ChatBubbleProps) {
+export function ChatBubble({ role, content, citation, imageUrl }: ChatBubbleProps) {
   const isUser = role === "user";
 
   return (
@@ -17,19 +18,23 @@ export function ChatBubble({ role, content, citation }: ChatBubbleProps) {
           <Bot className="w-5 h-5 text-emerald-600" />
         </div>
       )}
-      
+
       <div className={cn("flex flex-col gap-1 max-w-[82%]", isUser ? "items-end" : "items-start")}>
-        <div 
+        <div
           className={cn(
-            "p-4 rounded-[20px] text-[16px] leading-relaxed font-medium", 
-            isUser 
-              ? "bg-gradient-to-br from-emerald-500 to-teal-500 text-white rounded-br-sm shadow-[0_4px_15px_rgba(16,185,129,0.2)]" 
+            "p-4 rounded-[20px] text-[16px] leading-relaxed font-medium",
+            isUser
+              ? "bg-gradient-to-br from-emerald-500 to-teal-500 text-white rounded-br-sm shadow-[0_4px_15px_rgba(16,185,129,0.2)]"
               : "bg-white border-2 border-slate-200 text-slate-900 rounded-bl-sm shadow-sm"
           )}
         >
+          {imageUrl && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={imageUrl} alt="Uploaded" className="w-full max-w-[200px] rounded-lg mb-2 object-cover border border-black/10" />
+          )}
           {content}
         </div>
-        
+
         {/* Hộp trích dẫn hiển thị minh bạch nguồn gốc (Reliability) */}
         {!isUser && citation && (
           <div className="mt-1.5 flex items-start gap-2 bg-amber-50/80 border-2 border-amber-200 rounded-xl p-3 text-[13px] text-amber-900 shadow-sm max-w-full">

@@ -13,9 +13,11 @@ Toàn bộ mã nguồn dự án được đặt trong thư mục gốc `ArgiAI/`
 ```text
 ArgiAI/
 ├── docs/                 # 📚 Tài liệu, thiết kế và kế hoạch dự án
-├── frontend/             # 📱 Giao diện Web App (Mobile-first)
-│   ├── src/app/          # Các màn hình: Trang chủ, Chat, Cẩm nang
-│   ├── src/components/   # Component tái sử dụng (ChatBubble, BottomNav,...)
+├── frontend/             # 📱 Giao diện Web App (Kiến trúc DDD + Clean Architecture)
+│   ├── src/app/          # Tầng Routing (Next.js App Router)
+│   ├── src/core/         # Lõi hệ thống (Cấu hình, HTTP client)
+│   ├── src/shared/       # UI Components & Hooks dùng chung (Layout, Menu)
+│   ├── src/modules/      # Các Domain nghiệp vụ (chat, diagnostics, handbook)
 │   └── public/           # Tài nguyên hình ảnh, biểu tượng
 │
 ├── backend/              # ⚙️ Khung API Server
@@ -31,7 +33,9 @@ ArgiAI/
 Giao diện người dùng được thiết kế chuẩn mực theo phong cách **Premium Glassmorphism**, tối ưu hóa tuyệt đối cho trải nghiệm trên màn hình di động (Mobile Simulator) nhằm mang lại sự mượt mà và trực quan nhất.
 
 **Công nghệ sử dụng (Tech Stack):**
+- **Kiến trúc:** Domain-Driven Design (DDD) kết hợp Frontend Clean Architecture.
 - **Core:** Next.js 15+ (App Router), React.
+- **State & Data Fetching:** Zustand (Global State) và React Query (Server State/Caching).
 - **Styling:** Tailwind CSS.
 - **Typography:** Be Vietnam Pro (tối ưu hiển thị dấu tiếng Việt).
 - **Animations:** Framer Motion (hiệu ứng chuyển động mượt mà).
