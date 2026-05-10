@@ -1,19 +1,39 @@
-# 🌾 Nông Trí AI - Phân hệ Frontend
+# 📱 Phân hệ Frontend - Nông Trí AI
 
-Đây là phân hệ Frontend của dự án **Nông Trí AI**, được phát triển dựa trên Next.js (App Router) và áp dụng kiến trúc **Domain-Driven Design (DDD) + Clean Architecture**.
+Đây là phân hệ Giao diện người dùng của dự án **Nông Trí AI**, được phát triển dựa trên Next.js (App Router) và áp dụng triệt để kiến trúc **Domain-Driven Design (DDD) + Clean Architecture**.
 
-## 🏗 Cấu trúc Thư mục
+---
 
-Dự án áp dụng chia tách theo các miền nghiệp vụ (Domains), giúp mã nguồn dễ dàng mở rộng, bảo trì và dễ dàng test:
+## 🛠 Công nghệ sử dụng (Tech Stack)
 
-- `src/app/`: Lớp Framework (Routing & Providers). Chứa các trang Server Components tối giản.
-- `src/core/`: Các thiết lập lõi toàn cục (Error Handling, HTTP Client, Providers).
-- `src/shared/`: Các UI components, hooks và utils dùng chung cho toàn bộ dự án (ví dụ: BottomNav, TopHeader).
-- `src/modules/`: Chứa các phân hệ nghiệp vụ chính (chat, diagnostics, handbook), mỗi phân hệ gồm 4 tầng:
-  - **`domain/`**: Chứa Entities, Types, Interfaces (Tầng trung tâm, không phụ thuộc Framework).
-  - **`application/`**: Nơi chứa logic ứng dụng, use cases (Zustand Stores, React Query hooks).
-  - **`infrastructure/`**: Giao tiếp API, DTOs, Mappers mô phỏng data.
-  - **`presentation/`**: UI Components chuyên biệt của module đó (chỉ render UI, không gọi trực tiếp Axios/Fetch).
+- **Framework:** Next.js 15+ (App Router), React 19.
+- **Kiến trúc:** Domain-Driven Design (DDD) kết hợp Frontend Clean Architecture.
+- **State Management:** Zustand (Global State).
+- **Data Fetching/Caching:** React Query (TanStack Query) cho Server State.
+- **Styling:** Tailwind CSS.
+- **Typography:** Be Vietnam Pro (tối ưu hiển thị tiếng Việt).
+- **Animations:** Framer Motion (hiệu ứng chuyển động mượt mà).
+- **Icons:** Lucide React.
+
+---
+
+## 🏗 Kiến trúc & Cấu trúc Thư mục (Architecture & Directory Tree)
+
+Dự án áp dụng chia tách theo các miền nghiệp vụ (Domains), giúp mã nguồn dễ mở rộng, dễ bảo trì và test.
+
+```text
+frontend/
+├── public/               # Tài nguyên hình ảnh, biểu tượng
+└── src/
+    ├── app/              # Lớp Framework (Routing & Providers, Server Components)
+    ├── core/             # Thiết lập lõi toàn cục (Error Handling, HTTP Client)
+    ├── shared/           # UI Components, hooks và utils dùng chung (BottomNav, TopHeader)
+    └── modules/          # Các phân hệ nghiệp vụ chính (chat, diagnostics, handbook)
+        ├── domain/       # Entities, Types, Interfaces (Tầng trung tâm)
+        ├── application/  # Logic ứng dụng, Use Cases (Zustand Stores, React Query hooks)
+        ├── infrastructure/ # Giao tiếp API, DTOs, Mappers mô phỏng data
+        └── presentation/ # UI Components chuyên biệt của module (không gọi trực tiếp Axios/Fetch)
+```
 
 ### Sơ đồ Luồng dữ liệu (Dependency Rule)
 
@@ -44,7 +64,11 @@ flowchart TD
     I -. "Phụ thuộc" .-> D
 ```
 
-## 🚀 Cài đặt & Khởi chạy
+---
+
+## 🚀 Hướng dẫn Cài đặt & Khởi chạy (Local Development)
+
+Mở Terminal và di chuyển vào thư mục `frontend`:
 
 ```bash
 # 1. Cài đặt các gói phụ thuộc
@@ -54,12 +78,4 @@ npm install
 npm run dev
 ```
 
-Sau khi khởi chạy, truy cập vào [http://localhost:3000](http://localhost:3000) để xem ứng dụng.
-
-## 🛠 Công nghệ cốt lõi (Tech Stack)
-- **Framework:** Next.js 15+ (App Router), React
-- **State Management:** Zustand
-- **Data Fetching/Caching:** React Query (TanStack Query)
-- **Styling:** Tailwind CSS
-- **Font:** Be Vietnam Pro
-- **Icons:** Lucide React
+Sau khi khởi chạy, truy cập vào [http://localhost:3000](http://localhost:3000) để trải nghiệm ứng dụng.

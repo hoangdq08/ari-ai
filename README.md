@@ -85,15 +85,23 @@ Toàn bộ mã nguồn dự án được đặt trong thư mục gốc `ArgiAI/`
 ArgiAI/
 ├── docs/                 # 📚 Tài liệu, thiết kế và kế hoạch dự án
 ├── frontend/             # 📱 Giao diện Web App (Kiến trúc DDD + Clean Architecture)
-│   ├── src/app/          # Tầng Routing (Next.js App Router)
-│   ├── src/core/         # Lõi hệ thống (Cấu hình, HTTP client)
-│   ├── src/shared/       # UI Components & Hooks dùng chung (Layout, Menu)
-│   ├── src/modules/      # Các Domain nghiệp vụ (chat, diagnostics, handbook)
-│   └── public/           # Tài nguyên hình ảnh, biểu tượng
+│   ├── public/           # Tài nguyên hình ảnh, biểu tượng
+│   └── src/
+│       ├── app/          # Tầng Routing (Next.js App Router)
+│       ├── core/         # Lõi hệ thống (Cấu hình, HTTP client)
+│       ├── shared/       # UI Components & Hooks dùng chung
+│       └── modules/      # Các Domain nghiệp vụ (chat, diagnostics, handbook)
 │
-├── backend/              # ⚙️ Khung API Server
-│   └── README.md         # Tài liệu cấu trúc Backend
+├── backend/              # ⚙️ Hệ thống API Server (FastAPI + Clean Architecture)
+│   ├── app/
+│   │   ├── core/         # Lõi hệ thống (Cấu hình env, Dependency Injection)
+│   │   ├── shared/       # Error Handlers, Interfaces & Utils dùng chung
+│   │   └── modules/      # Các Domain nghiệp vụ (chat, diagnostics, handbook)
+│   ├── Dockerfile        # Cấu hình Docker
+│   ├── requirements.txt  # Thư viện Python
+│   └── README.md         # Tài liệu cấu trúc chi tiết Backend
 │
+├── docker-compose.yml    # File cấu hình chạy toàn bộ hệ thống
 └── README.md             # 📍 Tài liệu tổng quan dự án
 ```
 
@@ -103,44 +111,53 @@ ArgiAI/
 
 Giao diện người dùng được thiết kế chuẩn mực theo phong cách **Premium Glassmorphism**, tối ưu hóa tuyệt đối cho trải nghiệm trên màn hình di động (Mobile Simulator) nhằm mang lại sự mượt mà và trực quan nhất.
 
-**Công nghệ sử dụng (Tech Stack):**
+### 🛠 Công nghệ sử dụng (Tech Stack)
+
+- **Framework:** Next.js 15+ (App Router), React 19.
 - **Kiến trúc:** Domain-Driven Design (DDD) kết hợp Frontend Clean Architecture.
-- **Core:** Next.js 15+ (App Router), React.
-- **State & Data Fetching:** Zustand (Global State) và React Query (Server State/Caching).
+- **State Management:** Zustand (Global State).
+- **Data Fetching/Caching:** React Query (TanStack Query) cho Server State.
 - **Styling:** Tailwind CSS.
-- **Typography:** Be Vietnam Pro (tối ưu hiển thị dấu tiếng Việt).
+- **Typography:** Be Vietnam Pro (tối ưu hiển thị tiếng Việt).
 - **Animations:** Framer Motion (hiệu ứng chuyển động mượt mà).
 - **Icons:** Lucide React.
-
-**Tính năng nổi bật:**
-- 🌾 **Tối ưu hóa hiển thị ngoài trời:** Kích thước chữ lớn, độ tương phản cực cao giúp bà con nông dân dễ dàng theo dõi thông tin ngay cả dưới điều kiện nắng gắt.
-- 💬 **Màn hình Chat AI:** Giao diện trò chuyện trực quan, bố cục liền mạch, hỗ trợ gửi và phân tích hình ảnh sâu bệnh nhanh chóng.
-- 📚 **Cẩm nang thông minh:** Trải nghiệm đọc cẩm nang được sắp xếp khoa học, hỗ trợ tìm kiếm và phân loại dữ liệu cây trồng tiện lợi.
 
 ---
 
 ## ⚙️ Phân hệ Backend (API Server)
 
-Thư mục `backend/` được quy hoạch để xây dựng hệ thống API độc lập, chịu trách nhiệm xử lý các nghiệp vụ lõi của dự án:
-- Phân tích và chẩn đoán hình ảnh sâu bệnh qua Computer Vision.
-- Tích hợp mô hình Ngôn ngữ lớn (LLM) để vận hành Trợ lý AI.
-- Quản trị và truy xuất dữ liệu từ CSDL Cẩm nang nông nghiệp (Mô hình RAG).
+Thư mục `backend/` được quy hoạch chuẩn mực theo kiến trúc **Domain-Driven Design (DDD)** kết hợp **Clean Architecture** và cơ chế **Dependency Injection**, đảm bảo khả năng mở rộng tối đa. Hệ thống tập trung tối ưu chi phí bằng các giải pháp AI mã nguồn mở.
+
+### 🛠 Công nghệ sử dụng (Tech Stack)
+
+- **Framework:** FastAPI (Python) siêu tốc độ, hỗ trợ Async. Tích hợp sẵn cơ chế **Dependency Injection** qua `Depends()`.
+- **Kiến trúc:** Domain-Driven Design (DDD) kết hợp Backend Clean Architecture.
+- **Trí tuệ nhân tạo (Lõi LLM & Vision):** Gemini 1.5 Flash (Xử lý ảnh và phân tích ngữ cảnh RAG cực tốt, tiết kiệm chi phí).
+- **Voice-to-Text (Offline):** Faster-Whisper (Giải pháp mã nguồn mở chạy trực tiếp trên CPU, nhận diện tiếng Việt cực chuẩn mà không tốn phí API).
+- **Vector Database (Mã nguồn mở):** ChromaDB lưu trữ cục bộ, phục vụ kiến trúc RAG không giới hạn.
+- **AI Orchestrator:** LangChain/LangGraph điều phối luồng kiểm duyệt và tạo chuỗi suy luận.
 
 ---
 
 ## 🚀 Hướng dẫn Khởi chạy (Local Development)
 
 ### Khởi chạy toàn bộ hệ thống bằng Docker Compose (Khuyên dùng)
-Cách nhanh nhất để chạy dự án ở môi trường Production (Standalone) mà không cần quan tâm đến phiên bản Node.js:
+Cách nhanh nhất để chạy toàn bộ dự án (cả Frontend và Backend) ở môi trường Production mà không cần cấu hình phức tạp:
 
 ```bash
 # Đứng tại thư mục gốc của dự án (ArgiAI)
 docker compose up -d --build
 ```
-Dự án sẽ tự động đóng gói siêu nhẹ và chạy tại: [http://localhost:3000](http://localhost:3000). Để dừng server, chạy lệnh `docker compose down`.
+Hệ thống sẽ tự động đóng gói và bật song song 2 máy chủ:
+- 📱 **Giao diện Nông dân (Frontend)**: [http://localhost:3000](http://localhost:3000)
+- ⚙️ **Hệ thống API (Backend Swagger)**: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+Để dừng toàn bộ hệ thống, chạy lệnh `docker compose down`.
 
 ---
-### Khởi chạy giao diện Frontend (Thủ công)
+### Khởi chạy thủ công từng phân hệ (Môi trường Dev)
+
+#### 1. Chạy giao diện Frontend (Next.js)
 Nếu bạn muốn code và xem thay đổi ngay lập tức (Hot-Reload):
 
 ```bash
@@ -154,6 +171,26 @@ npm install
 npm run dev
 ```
 Sau đó, mở trình duyệt tại: [http://localhost:3000](http://localhost:3000) để trải nghiệm.
+
+#### 2. Chạy máy chủ Backend (FastAPI)
+Mở một tab Terminal mới:
+
+```bash
+# 1. Di chuyển vào thư mục backend
+cd backend
+
+# 2. Tạo môi trường ảo và cài đặt thư viện
+python3 -m venv venv
+source venv/bin/activate  # (Windows: venv\Scripts\activate)
+pip install -r requirements.txt
+
+# 3. Tạo file biến môi trường (Cấu hình API Key nếu cần)
+cp .env.example .env
+
+# 4. Chạy server FastAPI
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+Truy cập tài liệu API tự động tại: [http://localhost:8000/docs](http://localhost:8000/docs).
 
 ---
 *Dự án Nông Trí AI - Đồng hành cùng nền nông nghiệp Việt Nam.* 🌾
