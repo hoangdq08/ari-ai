@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: argiai_frontend
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    networks:
+      - argiai_net
+
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   container_name: argiai_backend
+  #   ports:
+  #     - "8000:8000"
+  #   restart: unless-stopped
+  #   environment:
+  #     - ENVIRONMENT=production
+  #   networks:
+  #     - argiai_net
+
+networks:
+  argiai_net:
+    driver: bridge

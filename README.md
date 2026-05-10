@@ -130,20 +130,30 @@ Thư mục `backend/` được quy hoạch để xây dựng hệ thống API đ
 
 ## 🚀 Hướng dẫn Khởi chạy (Local Development)
 
-### Chạy giao diện Frontend
-Mở Terminal và thực hiện các lệnh sau:
+### Khởi chạy toàn bộ hệ thống bằng Docker Compose (Khuyên dùng)
+Cách nhanh nhất để chạy dự án ở môi trường Production (Standalone) mà không cần quan tâm đến phiên bản Node.js:
+
+```bash
+# Đứng tại thư mục gốc của dự án (ArgiAI)
+docker compose up -d --build
+```
+Dự án sẽ tự động đóng gói siêu nhẹ và chạy tại: [http://localhost:3000](http://localhost:3000). Để dừng server, chạy lệnh `docker compose down`.
+
+---
+### Khởi chạy giao diện Frontend (Thủ công)
+Nếu bạn muốn code và xem thay đổi ngay lập tức (Hot-Reload):
 
 ```bash
 # 1. Di chuyển vào thư mục frontend
 cd frontend
 
-# 2. Cài đặt các gói phụ thuộc (nếu chưa cài)
+# 2. Cài đặt các gói phụ thuộc
 npm install
 
 # 3. Khởi động máy chủ giao diện
 npm run dev
 ```
-Sau đó, mở trình duyệt tại: [http://localhost:3000](http://localhost:3000) để trải nghiệm giao diện Nông Trí AI.
+Sau đó, mở trình duyệt tại: [http://localhost:3000](http://localhost:3000) để trải nghiệm.
 
 ---
 *Dự án Nông Trí AI - Đồng hành cùng nền nông nghiệp Việt Nam.* 🌾
