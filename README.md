@@ -8,6 +8,77 @@ Dự án được cấu trúc theo mô hình **Microservices**, phân tách rõ 
 
 ## 🏗 Cấu trúc Hệ thống (Architecture)
 
+### 1. Luồng hoạt động (Data Flow)
+Sơ đồ dưới đây thể hiện luồng luân chuyển dữ liệu từ phía Nông dân (Mobile/Web) tới các phân hệ AI cốt lõi của Backend.
+
+```mermaid
+flowchart TD
+    classDef userLayer fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a,rx:10,ry:10;
+    classDef securityLayer fill:#fef2f2,stroke:#ef4444,stroke-width:2px,color:#991b1b,rx:10,ry:10;
+    classDef coreLayer fill:#f0fdf4,stroke:#22c55e,stroke-width:2px,color:#166534,rx:10,ry:10;
+    classDef dbLayer fill:#f5f3ff,stroke:#8b5cf6,stroke-width:2px,color:#5b21b6,rx:10,ry:10;
+    classDef orchestrator fill:#fff7ed,stroke:#f97316,stroke-width:2px,color:#9a3412,rx:10,ry:10;
+
+    subgraph Client [🧑‍🌾 GIAO DIỆN ĐẦU VÀO]
+        direction LR
+        UI["📱 Web / App Mobile"]:::userLayer
+        Voice["🎙️ Ghi âm Giọng Nói"]:::userLayer
+        Cam["📸 Chụp Mẫu Bệnh"]:::userLayer
+    end
+
+    subgraph Robustness [🛡️ LỚP KIỂM DUYỆT Đoạn 1]
+        STT["Phân Tích & Dịch Giọng<br>(Speech-to-Text)"]:::securityLayer
+        CleanImg["Kiểm Tra Chất Lượng Ảnh<br>(Bộ Lọc Nhiễu)"]:::securityLayer
+        PromptGuard["Kiểm Duyệt Nội Dung<br>(Chống Hack/Jailbreak)"]:::securityLayer
+        Reject("🛑 Báo Lỗi / Từ Chối"):::securityLayer
+    end
+
+    subgraph Core [🧠 LÕI XỬ LÝ TRÍ TUỆ NHÂN TẠO]
+        Orchestrator{"ĐIỀU PHỐI AI Router"}:::orchestrator
+        RAG["🔍 RAG Engine<br>(Truy tìm ngữ cảnh)"]:::coreLayer
+        LLM["🤖 Logic Chẩn Đoán<br>(Vision & LLM)"]:::coreLayer
+    end
+
+    subgraph DB [📚 CƠ SỞ TRI THỨC]
+        Docs["Tài Liệu Nông Nghiệp<br>Khuyến Nông VN"]:::dbLayer
+        VectorDB[("Vector Database<br>(Pinecone/Chroma)")]:::dbLayer
+    end
+
+    subgraph Output [✨ KẾT QUẢ ĐẦU RA]
+        UI_Out["📱 Màn Hình Hiển Thị Của Nông Dân"]:::userLayer
+    end
+
+    %% Ép Layout xếp dọc để tránh vỡ khung hình
+    Client ~~~ Robustness
+    Robustness ~~~ Core
+    Core ~~~ Output
+
+    %% Các liên kết luồng đi xuống
+    UI -->|"Nhập Text"| PromptGuard
+    Voice -->|"File Audio"| STT
+    Cam -->|"File Ảnh"| CleanImg
+
+    STT -->|"Text"| PromptGuard
+    CleanImg -->|"Ảnh Đã Lọc"| PromptGuard
+
+    PromptGuard -->|"Hợp Lệ"| Orchestrator
+    PromptGuard -.->|"Vi Phạm"| Reject
+
+    Docs -.->|"Nhúng Data<br>(Embedding)"| VectorDB
+    Orchestrator -->|"Câu Hỏi"| RAG
+    
+    RAG -->|"Truy vấn"| VectorDB
+    VectorDB -.->|"Trả Ngữ cảnh"| RAG
+
+    RAG -->|"Gửi Ngữ Cảnh Chính Xác"| LLM
+    Orchestrator -->|"Gửi Ảnh Mẫu Bệnh"| LLM
+
+    %% Trả kết quả về giao diện cuối cùng
+    LLM ===>|"Trả Lời Khuyên & Nguồn Bệnh"| UI_Out
+    Reject -.->|"Hiển thị lỗi"| UI_Out
+```
+
+### 2. Cây thư mục (Directory Tree)
 Toàn bộ mã nguồn dự án được đặt trong thư mục gốc `ArgiAI/` với 2 phân hệ chính:
 
 ```text
