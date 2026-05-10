@@ -1,11 +1,19 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { ChatBubble } from "../components/ChatBubble";
 import { ChatInput } from "../components/ChatInput";
 import { useChatStore } from "../../application/useChatStore";
 
 export function ChatScreen() {
   const messages = useChatStore((state) => state.messages);
+  const isTyping = useChatStore((state) => state.isTyping);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
 
   return (
     <div className="flex flex-col min-h-full pb-24 pt-2 relative">
@@ -28,6 +36,25 @@ export function ChatScreen() {
             citation={msg.citation}
           />
         ))}
+
+        {/* Typing Indicator */}
+        {isTyping && (
+          <div className="flex w-full items-start gap-2.5 px-4 mb-4 mt-2">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center border border-emerald-200">
+              <span className="text-emerald-700 text-xs font-bold">AI</span>
+            </div>
+            <div className="flex flex-col gap-1 max-w-[85%]">
+              <div className="px-4 py-3 bg-white border-2 border-slate-200 text-slate-900 rounded-2xl rounded-tl-sm shadow-sm inline-flex">
+                <div className="flex space-x-1.5 items-center h-4">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Chat Input Bar */}

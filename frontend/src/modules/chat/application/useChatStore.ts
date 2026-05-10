@@ -3,7 +3,9 @@ import { Message } from "../domain/Message";
 
 interface ChatState {
   messages: Message[];
+  isTyping: boolean;
   addMessage: (message: Message) => void;
+  setTyping: (status: boolean) => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -25,5 +27,7 @@ export const useChatStore = create<ChatState>((set) => ({
       citation: "Cẩm nang Lúa Gạo - Cục Trồng trọt (Trang 45, Mục Phòng trừ bệnh đạo ôn)"
     }
   ],
+  isTyping: false,
   addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
+  setTyping: (status) => set({ isTyping: status }),
 }));
