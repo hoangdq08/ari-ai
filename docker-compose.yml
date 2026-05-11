@@ -3,12 +3,17 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     container_name: argiai_frontend
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-8080}:3000"
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     networks:
       - argiai_net
 
@@ -18,10 +23,21 @@ services:
       dockerfile: Dockerfile
     container_name: argiai_backend
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8081}:8000"
     restart: unless-stopped
     env_file:
-      - ./backend/.env
+      - .env
+    networks:
+      - argiai_net
+    depends_on:
+      - chromadb
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: argiai_chromadb
+    volumes:
+      - ./data/chromadb:/chroma/chroma
+    restart: unless-stopped
     networks:
       - argiai_net
 

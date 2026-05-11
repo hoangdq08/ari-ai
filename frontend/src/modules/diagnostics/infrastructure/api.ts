@@ -1,14 +1,23 @@
 import { DiseaseResult } from "../domain/DiseaseResult";
 
-export async function mockDiagnoseImage(_imageFile: File): Promise<DiseaseResult> {
-  // Simulate network delay
-  void _imageFile;
-  await new Promise(resolve => setTimeout(resolve, 2000));
+import { apiClient } from "../../../core/http/apiClient";
+
+export async function diagnoseImage(imageFile: File): Promise<DiseaseResult> {
+  const formData = new FormData();
+  formData.append("image", imageFile);
+
+  const response = await apiClient.post("/diagnostics/analyze", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  const data = response.data;
   
   return {
-    diseaseName: "Đạo ôn cổ bông",
-    confidence: 0.92,
-    advice: "Dạ, ảnh bà con tải lên cho thấy triệu chứng bệnh đạo ôn cổ bông khá rõ. Cần phun ngay thuốc đặc trị (như Tricyclazole) và ngừng bón đạm.",
-    citation: "Cẩm nang Bệnh học Lúa Gạo - Tr.45"
+    diseaseName: data.disease_name,
+    confidence: data.confidence,
+    advice: `${data.treatment} ${data.preventive_measures}`.trim(),
+    citation: "Nông Trí AI - Chẩn đoán bằng hình ảnh"
   };
 }

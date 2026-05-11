@@ -18,6 +18,8 @@ export function ChatInput() {
   const startXRef = useRef<number | null>(null);
 
   const addMessage = useChatStore((state) => state.addMessage);
+  const submitMessage = useChatStore((state) => state.submitMessage);
+  const submitAudio = useChatStore((state) => state.submitAudio);
   const setTyping = useChatStore((state) => state.setTyping);
   const diagnoseMutation = useDiagnoseImage();
 
@@ -40,22 +42,10 @@ export function ChatInput() {
     const textToSend = customText ?? text;
     if (!textToSend.trim()) return;
 
-    addMessage({
-      id: Date.now().toString(),
-      role: "user",
-      content: textToSend,
-    });
     if (!customText) setText("");
 
-    setTyping(true);
-    setTimeout(() => {
-      setTyping(false);
-      addMessage({
-        id: Date.now().toString(),
-        role: "ai",
-        content: "Dạ, tôi đã nhận được thông tin. Xin bà con chờ một lát để tôi tra cứu ạ."
-      });
-    }, 1500);
+    // Gọi lên Backend thông qua Store
+    submitMessage(textToSend);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -101,7 +91,7 @@ export function ChatInput() {
     e.preventDefault();
     try {
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    } catch (err) {}
+    } catch (err) { }
     setShowVoiceTooltip(false);
     setIsRecording(true);
     setRecordingTime(0);
@@ -124,16 +114,17 @@ export function ChatInput() {
     e?.preventDefault();
     try {
       if (e) (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch (err) {}
+    } catch (err) { }
     startXRef.current = null;
     if (!isRecording) return;
-    
+
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     setIsRecording(false);
-    
+
     if (recordingTime > 0) {
-      const mockSTT = "Bệnh đạo ôn trên lúa thì dùng thuốc gì hiệu quả nhất vậy chuyên gia?";
-      handleSendText(mockSTT);
+      // Gửi một Blob giả (empty audio) để trigger API Transcribe ở Backend thay vì Mock Frontend
+      const fakeAudioBlob = new Blob(["fake-audio-data"], { type: "audio/webm" });
+      submitAudio(fakeAudioBlob);
     }
     setRecordingTime(0);
   };
@@ -142,10 +133,10 @@ export function ChatInput() {
     e?.preventDefault();
     try {
       if (e) (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch (err) {}
+    } catch (err) { }
     startXRef.current = null;
     if (!isRecording) return;
-    
+
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     setIsRecording(false);
     setRecordingTime(0);
@@ -162,7 +153,7 @@ export function ChatInput() {
       {showImageMenu && (
         <div className="fixed inset-0 z-40 pointer-events-auto bg-transparent" onClick={() => setShowImageMenu(false)}></div>
       )}
-      
+
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-[448px] px-4 z-40 pointer-events-none safe-area-pb">
         {showImageMenu && (
           <div className="absolute bottom-[80px] left-4 bg-white rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.1)] border border-slate-100 p-2 z-50 w-[200px] pointer-events-auto flex flex-col gap-1 origin-bottom-left animate-in zoom-in-95 duration-200">
@@ -188,88 +179,88 @@ export function ChatInput() {
         )}
 
         <div className="mx-auto bg-white/95 backdrop-blur-xl border-2 border-emerald-100 p-2 rounded-[32px] shadow-[0_15px_40px_-10px_rgba(16,185,129,0.3)] pointer-events-auto transition-all flex items-center gap-1.5 relative z-50">
-        <input
-          type="file"
-          accept="image/*"
-          className="hidden"
-          ref={galleryInputRef}
-          onChange={handleImageUpload}
-        />
-        <input
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="hidden"
-          ref={cameraInputRef}
-          onChange={handleImageUpload}
-        />
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            ref={galleryInputRef}
+            onChange={handleImageUpload}
+          />
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            ref={cameraInputRef}
+            onChange={handleImageUpload}
+          />
 
-        {!isRecording && (
-          <button
-            onClick={() => setShowImageMenu(!showImageMenu)}
-            className={`p-2.5 transition-colors rounded-full flex-shrink-0 active:scale-95 ${showImageMenu ? "bg-emerald-100 text-emerald-600" : "text-slate-500 hover:text-emerald-600 bg-slate-100/80 hover:bg-emerald-50"
-              }`}
-          >
-            <ImageIcon className="w-[22px] h-[22px]" />
-          </button>
-        )}
-
-        <div className="flex-1 relative flex items-center">
-          {isRecording ? (
-            <div className="w-full flex items-center justify-between px-3 h-[48px] bg-red-50 border border-red-100/80 rounded-full">
-              <div className="flex items-center gap-2.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></div>
-                <span className="text-red-500 font-mono font-bold text-[15px] tracking-wide">{formatTime(recordingTime)}</span>
-              </div>
-              <span className="text-slate-400 text-[13px] font-medium mr-1 animate-pulse select-none">&lt; Trượt để hủy</span>
-            </div>
-          ) : (
-            <>
-              <input
-                type="text"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSendText()}
-                placeholder="Hỏi chuyên gia AI..."
-                className="w-full h-[48px] bg-slate-100/80 border-none text-[16px] text-slate-900 rounded-full pl-4 pr-12 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-emerald-500 transition-all placeholder:text-slate-500 font-medium"
-              />
-              {text.trim() && (
-                <button
-                  onClick={() => handleSendText()}
-                  className="absolute right-1.5 p-2 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-colors shadow-md active:scale-95"
-                >
-                  <Send className="w-[20px] h-[20px] ml-0.5" strokeWidth={2.5} />
-                </button>
-              )}
-            </>
-          )}
-        </div>
-
-        {!text.trim() && (
-          <div className="relative">
-            {showVoiceTooltip && !isRecording && (
-              <div className="absolute -top-[52px] right-0 bg-slate-800 text-white text-[13px] font-semibold px-4 py-2.5 rounded-2xl whitespace-nowrap animate-bounce shadow-lg after:content-[''] after:absolute after:bottom-[-5px] after:right-[14px] after:w-3 after:h-3 after:bg-slate-800 after:rotate-45">
-                Nhấn giữ để nói
-              </div>
-            )}
-
+          {!isRecording && (
             <button
-              onPointerDown={handleStartRecording}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handleStopRecording}
-              onPointerCancel={handleCancelRecording}
-              onContextMenu={(e) => e.preventDefault()}
-              className={`p-2.5 transition-all duration-200 flex-shrink-0 touch-none select-none ${isRecording
-                ? "bg-emerald-500 text-white rounded-full scale-125 shadow-[0_5px_15px_rgba(16,185,129,0.4)] mr-1"
-                : "text-emerald-600 bg-emerald-100/80 hover:bg-emerald-200 rounded-full shadow-sm"
+              onClick={() => setShowImageMenu(!showImageMenu)}
+              className={`p-2.5 transition-colors rounded-full flex-shrink-0 active:scale-95 ${showImageMenu ? "bg-emerald-100 text-emerald-600" : "text-slate-500 hover:text-emerald-600 bg-slate-100/80 hover:bg-emerald-50"
                 }`}
             >
-              <Mic className="w-[22px] h-[22px]" />
+              <ImageIcon className="w-[22px] h-[22px]" />
             </button>
+          )}
+
+          <div className="flex-1 relative flex items-center">
+            {isRecording ? (
+              <div className="w-full flex items-center justify-between px-3 h-[48px] bg-red-50 border border-red-100/80 rounded-full">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></div>
+                  <span className="text-red-500 font-mono font-bold text-[15px] tracking-wide">{formatTime(recordingTime)}</span>
+                </div>
+                <span className="text-slate-400 text-[13px] font-medium mr-1 animate-pulse select-none">&lt; Trượt để hủy</span>
+              </div>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSendText()}
+                  placeholder="Hỏi chuyên gia AI..."
+                  className="w-full h-[48px] bg-slate-100/80 border-none text-[16px] text-slate-900 rounded-full pl-4 pr-12 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-emerald-500 transition-all placeholder:text-slate-500 font-medium"
+                />
+                {text.trim() && (
+                  <button
+                    onClick={() => handleSendText()}
+                    className="absolute right-1.5 p-2 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-colors shadow-md active:scale-95"
+                  >
+                    <Send className="w-[20px] h-[20px] ml-0.5" strokeWidth={2.5} />
+                  </button>
+                )}
+              </>
+            )}
           </div>
-        )}
+
+          {!text.trim() && (
+            <div className="relative">
+              {showVoiceTooltip && !isRecording && (
+                <div className="absolute -top-[52px] right-0 bg-slate-800 text-white text-[13px] font-semibold px-4 py-2.5 rounded-2xl whitespace-nowrap animate-bounce shadow-lg after:content-[''] after:absolute after:bottom-[-5px] after:right-[14px] after:w-3 after:h-3 after:bg-slate-800 after:rotate-45">
+                  Nhấn giữ để nói
+                </div>
+              )}
+
+              <button
+                onPointerDown={handleStartRecording}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handleStopRecording}
+                onPointerCancel={handleCancelRecording}
+                onContextMenu={(e) => e.preventDefault()}
+                className={`p-2.5 transition-all duration-200 flex-shrink-0 touch-none select-none ${isRecording
+                  ? "bg-emerald-500 text-white rounded-full scale-125 shadow-[0_5px_15px_rgba(16,185,129,0.4)] mr-1"
+                  : "text-emerald-600 bg-emerald-100/80 hover:bg-emerald-200 rounded-full shadow-sm"
+                  }`}
+              >
+                <Mic className="w-[22px] h-[22px]" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
     </>
   );
 }

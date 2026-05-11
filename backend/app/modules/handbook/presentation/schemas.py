@@ -1,10 +1,12 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 class SearchResultItem(BaseModel):
+    id: str
     title: str
     content: str
-    similarity_score: float
+    category: str
+    similarity_score: Optional[float] = None
 
 class SearchHandbookResponse(BaseModel):
     results: List[SearchResultItem]

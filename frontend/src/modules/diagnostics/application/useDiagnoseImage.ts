@@ -1,9 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
-import { mockDiagnoseImage } from "../infrastructure/api";
+import { diagnoseImage } from "../infrastructure/api";
 import { DiseaseResult } from "../domain/DiseaseResult";
 
 export function useDiagnoseImage() {
   return useMutation<DiseaseResult, Error, File>({
-    mutationFn: (file: File) => mockDiagnoseImage(file),
+    mutationFn: (file: File) => diagnoseImage(file),
   });
 }

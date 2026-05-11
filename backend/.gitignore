@@ -1,5 +1,10 @@
 # Environments
 .env
+.env.local
+.env.*.local
+*.env
+
+# Dependencies
 .venv
 env/
 venv/
