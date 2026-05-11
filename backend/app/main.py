@@ -1,5 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.config import settings
 
 def get_application() -> FastAPI:
@@ -31,6 +33,22 @@ def get_application() -> FastAPI:
     return application
 
 app = get_application()
+
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "status": "error",
+                "message": "Endpoint không tồn tại hoặc đã bị di dời.",
+                "data": None
+            }
+        )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"status": "error", "message": str(exc.detail)}
+    )
 
 @app.get("/health")
 def health_check():
