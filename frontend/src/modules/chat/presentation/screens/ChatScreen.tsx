@@ -34,6 +34,7 @@ export function ChatScreen() {
             role={msg.role} 
             content={msg.content} 
             citation={msg.citation}
+            imageUrl={msg.imageUrl}
           />
         ))}
 

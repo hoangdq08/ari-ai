@@ -58,7 +58,7 @@ export function ChatInput() {
     addMessage({
       id: Date.now().toString(),
       role: "user",
-      content: "Tôi vừa gửi một hình ảnh, nhờ chuyên gia xem giúp.",
+      content: "",
       imageUrl: imageUrl,
     });
 
@@ -188,7 +188,7 @@ export function ChatInput() {
           />
           <input
             type="file"
-            accept="image/*"
+            accept="image/jpeg, image/png, image/jpg"
             capture="environment"
             className="hidden"
             ref={cameraInputRef}

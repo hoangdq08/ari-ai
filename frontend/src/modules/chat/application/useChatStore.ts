@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { Message } from "../domain/Message";
 import { chatApi } from "../infrastructure/chat.api";
 
@@ -9,21 +10,28 @@ interface ChatState {
   setTyping: (status: boolean) => void;
   submitMessage: (text: string) => Promise<void>;
   submitAudio: (file: Blob) => Promise<void>;
+  clearChat: () => void;
 }
 
-export const useChatStore = create<ChatState>((set, get) => ({
-  messages: [
-    {
-      id: "1",
-      role: "ai",
-      content: "Chào bà con! Hôm nay ruộng đồng nhà mình có gặp vấn đề gì không ạ?"
-    }
-  ],
-  isTyping: false,
+const defaultMessages: Message[] = [
+  {
+    id: "1",
+    role: "ai",
+    content: "Chào bà con! Hôm nay ruộng đồng nhà mình có gặp vấn đề gì không ạ?"
+  }
+];
+
+export const useChatStore = create<ChatState>()(
+  persist(
+    (set, get) => ({
+      messages: defaultMessages,
+      isTyping: false,
   
   addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
   
   setTyping: (status) => set({ isTyping: status }),
+
+  clearChat: () => set({ messages: defaultMessages, isTyping: false }),
   
   submitMessage: async (text: string) => {
     const userMessageId = Date.now().toString();
@@ -80,4 +88,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
     }
   }
-}));
+    }),
+    {
+      name: 'nong-tri-chat-storage',
+      partialize: (state) => ({ messages: state.messages }),
+    }
+  )
+);
