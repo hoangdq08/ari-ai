@@ -1,18 +1,28 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Depends
 from .schemas import DiagnoseResponse
+from ..application.service import DiagnosticsService
+from ..infrastructure.di import get_diagnostics_service
 
 router = APIRouter()
 
 @router.post("/analyze", response_model=DiagnoseResponse)
-async def analyze_disease(image: UploadFile = File(...)):
+async def analyze_disease(
+    image: UploadFile = File(...),
+    diagnostics_service: DiagnosticsService = Depends(get_diagnostics_service)
+):
     """
     Phân tích hình ảnh bệnh cây bằng AI Vision.
-    Tạm thời trả về Mock Data.
     """
-    # TODO: Tích hợp Gemini Vision Pro
+    file_bytes = await image.read()
+    filename = image.filename or "unknown.jpg"
+    
+    # Uỷ thác nghiệp vụ cho tầng Application
+    result = diagnostics_service.analyze_image(file_bytes=file_bytes, filename=filename)
+    
+    # Map từ Entity (Domain) sang Schema (Presentation)
     return DiagnoseResponse(
-        disease_name="[MOCK] Bệnh đạo ôn trên lúa",
-        confidence=0.92,
-        treatment="Sử dụng thuốc bảo vệ thực vật có chứa hoạt chất Tricyclazole.",
-        preventive_measures="Vệ sinh đồng ruộng, dọn sạch tàn dư lúa bệnh."
+        disease_name=result.disease_name,
+        confidence=result.confidence,
+        treatment=result.treatment,
+        preventive_measures=result.preventive_measures
     )

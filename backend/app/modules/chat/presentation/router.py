@@ -1,25 +1,31 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Depends
 from .schemas import ChatMessageRequest, ChatMessageResponse, TranscribeResponse
+from ..application.service import ChatService
+from ..infrastructure.di import get_chat_service
 
 router = APIRouter()
 
 @router.post("/transcribe", response_model=TranscribeResponse)
-async def transcribe_audio(file: UploadFile = File(...)):
+async def transcribe_audio(
+    file: UploadFile = File(...),
+    chat_service: ChatService = Depends(get_chat_service)
+):
     """
     Chuyển đổi file âm thanh (giọng nói) thành văn bản (Speech-to-Text).
-    Tạm thời trả về Mock Data.
     """
-    # TODO: Tích hợp Faster-Whisper
-    return TranscribeResponse(text="[MOCK] Đây là văn bản được nhận diện từ file âm thanh của bạn.")
+    file_bytes = await file.read()
+    filename = file.filename or "audio.webm"
+    
+    result = chat_service.transcribe_audio(file_bytes=file_bytes, filename=filename)
+    return TranscribeResponse(text=result.text)
 
 @router.post("/message", response_model=ChatMessageResponse)
-async def send_message(request: ChatMessageRequest):
+async def send_message(
+    request: ChatMessageRequest,
+    chat_service: ChatService = Depends(get_chat_service)
+):
     """
     Gửi tin nhắn text lên trợ lý AI và nhận phản hồi.
-    Tạm thời trả về Mock Data.
     """
-    # TODO: Tích hợp RAG / Gemini LLM
-    return ChatMessageResponse(
-        reply=f"[MOCK] Trợ lý Nông Trí AI nhận được câu hỏi: '{request.message}'. Gợi ý cách xử lý: Phun thuốc X.",
-        sources=["[MOCK] Cẩm nang Khuyến Nông VN - Tập 1"]
-    )
+    result = chat_service.send_message(message=request.message, session_id=request.session_id)
+    return ChatMessageResponse(reply=result.reply, sources=result.sources)
