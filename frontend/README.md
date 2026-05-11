@@ -29,10 +29,12 @@ frontend/
     ├── core/             # Thiết lập lõi toàn cục (Error Handling, HTTP Client)
     ├── shared/           # UI Components, hooks và utils dùng chung (BottomNav, TopHeader)
     └── modules/          # Các phân hệ nghiệp vụ chính (chat, diagnostics, handbook)
-        ├── domain/       # Entities, Types, Interfaces (Tầng trung tâm)
+        ├── domain/       # Tầng trung tâm (Core)
+        │   ├── entities/   # Các object, type định nghĩa hình dáng dữ liệu
+        │   └── interfaces/ # Các hợp đồng (contracts) cho API / Repository
         ├── application/  # Logic ứng dụng, Use Cases (Zustand Stores, React Query hooks)
-        ├── infrastructure/ # Giao tiếp API, DTOs, Mappers mô phỏng data
-        └── presentation/ # UI Components chuyên biệt của module (không gọi trực tiếp Axios/Fetch)
+        ├── infrastructure/ # Giao tiếp API, implement các interfaces từ domain
+        └── presentation/ # UI Components chuyên biệt của module (đóng vai trò Composition Root để inject dependency)
 ```
 
 ### Sơ đồ Luồng dữ liệu (Dependency Rule)
@@ -48,20 +50,20 @@ flowchart TD
     
     P["🖥️ Presentation Layer<br/>(UI Component / Screen)"]:::presentation
     A["⚙️ Application Layer<br/>(Zustand / React Query)"]:::application
-    I["🌐 Infrastructure Layer<br/>(Fetch / Axios / Mappers)"]:::infra
-    D["🧱 Domain Layer<br/>(Entities / Types)"]:::domain
+    I["🌐 Infrastructure Layer<br/>(Fetch / Axios / API Impl)"]:::infra
+    D["🧱 Domain Layer<br/>(Entities / Interfaces)"]:::domain
     
-    P == "1. Trigger Action" ==> A
+    P == "1. Inject API + Gọi Hook" ==> A
     A -. "4. Cập nhật UI" .-> P
     
-    A == "2. Gọi hàm Data" ==> I
+    A == "2. Gọi qua Interface" ==> I
     I -. "3. Trả Domain Entity" .-> A
     
     I == "Gửi HTTP Request" ==> Server[("☁️ Backend Server")]
     
     P -. "Phụ thuộc" .-> D
     A -. "Phụ thuộc" .-> D
-    I -. "Phụ thuộc" .-> D
+    I -. "Implements" .-> D
 ```
 
 ---

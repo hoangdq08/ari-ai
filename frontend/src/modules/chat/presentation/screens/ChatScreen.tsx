@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Eraser } from "lucide-react";
 import { ChatBubble } from "../components/ChatBubble";
 import { ChatInput } from "../components/ChatInput";
 import { useChatStore } from "../../application/useChatStore";
@@ -8,7 +10,19 @@ import { useChatStore } from "../../application/useChatStore";
 export function ChatScreen() {
   const messages = useChatStore((state) => state.messages);
   const isTyping = useChatStore((state) => state.isTyping);
+  const clearChat = useChatStore((state) => state.clearChat);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [headerActionsNode, setHeaderActionsNode] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setHeaderActionsNode(document.getElementById('header-actions'));
+  }, []);
+
+  const handleClearChat = () => {
+    if (window.confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử trò chuyện không?")) {
+      clearChat();
+    }
+  };
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -60,6 +74,18 @@ export function ChatScreen() {
 
       {/* Chat Input Bar */}
       <ChatInput />
+
+      {/* Clear Chat Button (Portal into Header) */}
+      {headerActionsNode && createPortal(
+        <button 
+          onClick={handleClearChat}
+          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors active:scale-95"
+          title="Xóa lịch sử trò chuyện"
+        >
+          <Eraser className="w-[22px] h-[22px]" strokeWidth={2.5} />
+        </button>,
+        headerActionsNode
+      )}
     </div>
   );
 }

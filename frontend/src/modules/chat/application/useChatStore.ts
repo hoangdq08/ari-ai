@@ -1,15 +1,16 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import { Message } from "../domain/Message";
-import { chatApi } from "../infrastructure/chat.api";
+import { persist, createJSONStorage } from "zustand/middleware";
+import { Message } from "../domain/entities/Message";
+import { IChatApi } from "../domain/interfaces/IChatApi";
+import { chatStorageAdapter } from "../infrastructure/chat.storage";
 
 interface ChatState {
   messages: Message[];
   isTyping: boolean;
   addMessage: (message: Message) => void;
   setTyping: (status: boolean) => void;
-  submitMessage: (text: string) => Promise<void>;
-  submitAudio: (file: Blob) => Promise<void>;
+  submitMessage: (text: string, api: IChatApi) => Promise<void>;
+  submitAudio: (file: Blob, api: IChatApi) => Promise<void>;
   clearChat: () => void;
 }
 
@@ -33,7 +34,7 @@ export const useChatStore = create<ChatState>()(
 
   clearChat: () => set({ messages: defaultMessages, isTyping: false }),
   
-  submitMessage: async (text: string) => {
+  submitMessage: async (text: string, api: IChatApi) => {
     const userMessageId = Date.now().toString();
     // Thêm tin nhắn user vào giao diện
     get().addMessage({
@@ -45,8 +46,8 @@ export const useChatStore = create<ChatState>()(
     get().setTyping(true);
     
     try {
-      // Gọi API Backend thực tế
-      const response = await chatApi.sendMessage({ message: text });
+      // Gọi API qua Interface được tiêm (Dependency Injection)
+      const response = await api.sendMessage({ message: text });
       
       // Thêm phản hồi của AI vào giao diện
       get().addMessage({
@@ -67,17 +68,17 @@ export const useChatStore = create<ChatState>()(
     }
   },
 
-  submitAudio: async (file: Blob) => {
+  submitAudio: async (file: Blob, api: IChatApi) => {
     get().setTyping(true);
     try {
       // Gọi API STT Backend
-      const transcribeRes = await chatApi.transcribeAudio(file);
+      const transcribeRes = await api.transcribeAudio(file);
       const transcribedText = transcribeRes.text;
       
       get().setTyping(false);
       
       // Gửi text vừa nhận diện được như một tin nhắn bình thường
-      await get().submitMessage(transcribedText);
+      await get().submitMessage(transcribedText, api);
     } catch (error) {
       console.error("Lỗi khi nhận diện giọng nói:", error);
       get().setTyping(false);
@@ -91,6 +92,7 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: 'nong-tri-chat-storage',
+      storage: createJSONStorage(() => chatStorageAdapter),
       partialize: (state) => ({ messages: state.messages }),
     }
   )
