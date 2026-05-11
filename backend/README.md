@@ -1,44 +1,25 @@
 # ⚙️ Phân hệ Backend - Nông Trí AI
 
-Đây là phân hệ API Server (Backend) của dự án **Nông Trí AI**, được xây dựng trên nền tảng **FastAPI (Python)** và áp dụng triệt để kiến trúc **Domain-Driven Design (DDD) + Clean Architecture**.
+Đây là phân hệ API Server (Backend) của dự án **Nông Trí AI**, được xây dựng trên nền tảng **FastAPI (Python)** và áp dụng triệt để kiến trúc **Domain-Driven Design (DDD)** kết hợp **Clean Architecture**.
 
-Mục tiêu chính của Backend là xử lý luồng Logic nghiệp vụ AI (Chẩn đoán ảnh sâu bệnh, Phân tích Giọng nói, Truy xuất Cẩm nang Nông nghiệp) với chi phí tối ưu nhất nhờ việc ứng dụng tối đa các giải pháp **Mã nguồn mở (Open Source)**.
+Mục tiêu chính của Backend là xử lý luồng Logic nghiệp vụ AI (Chẩn đoán bệnh thực vật, Phân tích giọng nói, Truy xuất Cẩm nang) với chi phí tối ưu nhất nhờ việc ứng dụng tối đa các giải pháp **Mã nguồn mở (Open Source)**.
 
 ---
 
 ## 🛠 Công nghệ sử dụng (Tech Stack)
 
-- **Framework:** FastAPI (Python) siêu tốc độ, hỗ trợ Async.
-- **Kiến trúc:** Domain-Driven Design (DDD) kết hợp Backend Clean Architecture. Tích hợp sẵn cơ chế **Dependency Injection** qua `Depends()`.
-- **Trí tuệ nhân tạo (Lõi LLM & Vision):** Gemini 1.5 Flash (Xử lý ảnh và phân tích ngữ cảnh RAG cực tốt, tiết kiệm chi phí).
-- **Voice-to-Text (Offline):** Faster-Whisper (Giải pháp mã nguồn mở chạy trực tiếp trên CPU, nhận diện tiếng Việt cực chuẩn mà không tốn phí API).
-- **Vector Database (Mã nguồn mở):** ChromaDB lưu trữ cục bộ, phục vụ kiến trúc RAG không giới hạn.
-- **AI Orchestrator:** LangChain/LangGraph điều phối luồng kiểm duyệt và tạo chuỗi suy luận.
+- **Framework:** FastAPI (Python), Async.
+- **Kiến trúc:** Domain-Driven Design (DDD) + Clean Architecture + Dependency Injection (DI).
+- **Trí tuệ nhân tạo (Vision & LLM):** Gemini 1.5 Flash (Tối ưu chi phí, thay thế bản PRO/OpenAI trong kế hoạch cũ).
+- **Xử lý Giọng nói (Voice-to-Text):** Faster-Whisper (Chạy Offline, thay thế FPT.AI).
+- **Vector Database:** ChromaDB (Lưu trữ cục bộ, thay thế Pinecone).
+- **AI Orchestrator:** LangGraph (Được chọn để quản lý State và luồng Agent phức tạp thay vì LangChain cơ bản).
 
 ---
 
 ## 🏗 Kiến trúc & Cấu trúc Thư mục (Architecture & Directory Tree)
 
-Dự án áp dụng chia tách theo các miền nghiệp vụ (Domains), giúp mã nguồn dễ mở rộng, dễ bảo trì và dễ dàng test độc lập.
-
-```text
-backend/
-├── app/
-│   ├── main.py                    # Lớp Framework (Khởi chạy FastAPI, cấu hình CORS & Routers)
-│   ├── core/                      # Thiết lập lõi toàn cục (Config Env, Dependency Injection)
-│   ├── shared/                    # Error Handlers, HTTP Clients, Interface dùng chung
-│   └── modules/                   # Các phân hệ nghiệp vụ chính (chat, diagnostics, handbook)
-│       ├── domain/                # Entities, Types, Interfaces (Tầng trung tâm)
-│       ├── application/           # Logic ứng dụng, Use Cases
-│       ├── infrastructure/        # Giao tiếp Database, AI Models, DTOs, Mappers
-│       └── presentation/          # FastAPI Routes (Controllers) chuyên biệt của module
-│
-├── requirements.txt               # Các thư viện Python cần thiết
-├── Dockerfile                     # Đóng gói API Server
-└── README.md                      # Tài liệu cấu trúc chi tiết Backend
-```
-
-### Sơ đồ Luồng dữ liệu (Dependency Rule)
+### 1. Sơ đồ Luồng dữ liệu (Data Flow & Dependency Rule)
 
 Quy tắc cốt lõi: Các tầng bên ngoài (Presentation, Infrastructure) đều phụ thuộc vào tầng bên trong (Domain). Tầng Domain hoàn toàn độc lập với mọi Framework bên ngoài.
 
@@ -67,36 +48,35 @@ flowchart TD
     I -. "Phụ thuộc (Implement)" .-> D
 ```
 
+### 2. Cây thư mục (Directory Tree)
+
+Dự án áp dụng chia tách theo các miền nghiệp vụ (Domains), giúp mã nguồn dễ mở rộng, dễ bảo trì và test độc lập.
+
+```text
+backend/
+├── app/
+│   ├── main.py                    # Lớp Framework (Khởi chạy FastAPI, cấu hình CORS & Routers)
+│   ├── core/                      # Thiết lập lõi toàn cục (Config Env, Dependency Injection)
+│   ├── shared/                    # Error Handlers, HTTP Clients, Interface dùng chung
+│   └── modules/                   # Các phân hệ nghiệp vụ chính (chat, diagnostics, handbook)
+│       ├── domain/
+│       │   ├── entities.py        # Các object, type định nghĩa hình dáng dữ liệu
+│       │   └── interfaces.py      # Các hợp đồng (contracts) cho Repository / API ngoài
+│       ├── application/           # Logic ứng dụng, Use Cases
+│       ├── infrastructure/        # Giao tiếp Database, AI Models, DTOs, Mappers
+│       └── presentation/          # FastAPI Routes (Controllers) chuyên biệt của module
+│
+├── requirements.txt               # Các thư viện Python cần thiết
+└── Dockerfile                     # Đóng gói API Server
+```
+
 ---
 
-## 🚀 Hướng dẫn Cài đặt & Khởi chạy (Local Development)
+## 🚀 Hướng dẫn Cài đặt & Khởi chạy (Docker-Only)
 
-### 1. Khởi chạy bằng Docker Compose (Khuyên dùng)
-Nếu bạn muốn chạy song song cả Frontend và Backend cực kỳ tiện lợi:
-Vui lòng di chuyển ra **Thư mục gốc (Root)** của toàn bộ dự án Nông Trí AI và gõ lệnh:
+Để giải quyết triệt để các vấn đề cài đặt phức tạp liên quan đến `ffmpeg` (để nhận diện giọng nói) và thiết lập mạng kết nối nội bộ với Vector DB (ChromaDB), phân hệ Backend được cấu hình để **chỉ khởi chạy thông qua Docker Compose** ở thư mục gốc.
 
-```bash
-docker compose up -d --build
-```
+Vui lòng tham khảo [👉 Hướng dẫn Khởi chạy tại Tài liệu Gốc](../README.md#🚀-hướng-dẫn-cài-đặt--khởi-chạy-docker-only) để bật toàn bộ hệ thống bằng một dòng lệnh duy nhất.
 
-*Lưu ý: Hệ thống sẽ được bật ở cổng `8000` đối với Backend.*
-
-### 2. Khởi chạy Local (Môi trường Dev)
-Mở Terminal và đứng tại thư mục `backend/`, thực hiện các bước sau:
-
-```bash
-# 1. Tạo môi trường ảo (Virtual Environment)
-python3 -m venv venv
-source venv/bin/activate  # (Với Windows: venv\Scripts\activate)
-
-# 2. Cài đặt thư viện (Yêu cầu máy cài sẵn `ffmpeg` cho faster-whisper)
-pip install -r requirements.txt
-
-# 3. Thiết lập Biến môi trường
-cp .env.example .env
-
-# 4. Chạy Server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Sau đó truy cập **Swagger UI** tại: [http://localhost:8000/docs](http://localhost:8000/docs) để test các APIs.
+---
+*Dự án Nông Trí AI - Đồng hành cùng nền nông nghiệp Việt Nam.* 🌾
