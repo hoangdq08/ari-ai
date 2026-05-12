@@ -1,5 +1,11 @@
 import { ChatScreen } from "@/modules/chat/presentation/screens/ChatScreen";
 
+import { ChatStoreProvider } from "@/modules/chat/presentation/stores/useChatStore";
+
 export default function ChatPage() {
-  return <ChatScreen />;
+  return (
+    <ChatStoreProvider>
+      <ChatScreen />
+    </ChatStoreProvider>
+  );
 }

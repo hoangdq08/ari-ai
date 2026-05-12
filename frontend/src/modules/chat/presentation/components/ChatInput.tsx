@@ -2,10 +2,8 @@
 
 import { Send, Image as ImageIcon, Mic, Camera as CameraIcon, ImagePlus } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
-import { useChatStore } from "../../application/useChatStore";
-import { useDiagnoseImage } from "@/modules/diagnostics/application/useDiagnoseImage";
-import { chatApi } from "../../infrastructure/chat.api";
-import { diagnosticsApi } from "@/modules/diagnostics/infrastructure/diagnostics.api";
+import { useChat } from "../hooks/useChat";
+import { useDiagnoseImage } from "@/modules/diagnostics/presentation/hooks/useDiagnoseImage";
 
 export function ChatInput() {
   const [text, setText] = useState("");
@@ -19,11 +17,8 @@ export function ChatInput() {
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const startXRef = useRef<number | null>(null);
 
-  const addMessage = useChatStore((state) => state.addMessage);
-  const submitMessage = useChatStore((state) => state.submitMessage);
-  const submitAudio = useChatStore((state) => state.submitAudio);
-  const setTyping = useChatStore((state) => state.setTyping);
-  const diagnoseMutation = useDiagnoseImage(diagnosticsApi);
+  const { submitMessage, submitAudio, setTyping, addMessage } = useChat();
+  const diagnoseMutation = useDiagnoseImage();
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -46,8 +41,8 @@ export function ChatInput() {
 
     if (!customText) setText("");
 
-    // Gọi lên Backend thông qua Store, tiêm dependency (chatApi)
-    submitMessage(textToSend, chatApi);
+    // Gọi lên Backend thông qua UseCase
+    submitMessage(textToSend);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -126,7 +121,7 @@ export function ChatInput() {
     if (recordingTime > 0) {
       // Gửi một Blob giả (empty audio) để trigger API Transcribe ở Backend thay vì Mock Frontend
       const fakeAudioBlob = new Blob(["fake-audio-data"], { type: "audio/webm" });
-      submitAudio(fakeAudioBlob, chatApi);
+      submitAudio(fakeAudioBlob);
     }
     setRecordingTime(0);
   };

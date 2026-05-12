@@ -22,26 +22,26 @@ Quy tắc cốt lõi: Các tầng bên ngoài phụ thuộc vào tầng bên tro
 ```mermaid
 flowchart TD
     classDef domain fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e,rx:8,ry:8
-    classDef application fill:#e0e7ff,stroke:#4f46e5,stroke-width:2px,color:#3730a3,rx:8,ry:8
     classDef infra fill:#fce7f3,stroke:#db2777,stroke-width:2px,color:#9d174d,rx:8,ry:8
     classDef presentation fill:#dcfce3,stroke:#16a34a,stroke-width:2px,color:#166534,rx:8,ry:8
+    classDef core fill:#e0e7ff,stroke:#4f46e5,stroke-width:2px,color:#3730a3,rx:8,ry:8
     
-    P["🖥️ Presentation Layer<br/>(UI Component / Screen)"]:::presentation
-    A["⚙️ Application Layer<br/>(Zustand / React Query)"]:::application
-    I["🌐 Infrastructure Layer<br/>(Fetch / Axios / API Impl)"]:::infra
-    D["🧱 Domain Layer<br/>(Entities / Interfaces)"]:::domain
+    P["🖥️ Presentation Layer<br/>(UI Components, Hooks, Stores)"]:::presentation
+    C["⚙️ Core / DI<br/>(Composition Root / Registry)"]:::core
+    D["🧱 Domain Layer<br/>(Models, Repository Interfaces)"]:::domain
+    I["🌐 Infrastructure Layer<br/>(API Implementations)"]:::infra
     
-    P == "1. Inject API + Gọi Hook" ==> A
-    A -. "4. Cập nhật UI" .-> P
+    C -. "1. Khởi tạo & Tiêm (Inject) Dependencies" .-> P
+    C -. "1. Quản lý vòng đời" .-> I
     
-    A == "2. Gọi qua Interface" ==> I
-    I -. "3. Trả Domain Entity" .-> A
+    P -- "2. Gọi hàm (Chỉ biết Interface)" --> D
+    I -. "3. Thực thi (Implements Interface)" .-> D
     
-    I == "Gửi HTTP Request" ==> Server[("☁️ Backend Server")]
+    I == "4. Giao tiếp mạng" ==> Server[("☁️ Backend Server")]
     
-    P -. "Phụ thuộc" .-> D
-    A -. "Phụ thuộc" .-> D
-    I -. "Implements" .-> D
+    %% Chú thích Dependency Rule
+    P -. "Phụ thuộc chiều xuôi" .-> D
+    I -. "Phụ thuộc đảo ngược (DIP)" .-> D
 ```
 
 ### 2. Cây thư mục (Directory Tree)
@@ -53,15 +53,14 @@ frontend/
 ├── public/               # Tài nguyên hình ảnh, biểu tượng
 └── src/
     ├── app/              # Lớp Framework (Routing & Providers, Server Components)
-    ├── core/             # Thiết lập lõi toàn cục (Error Handling, HTTP Client)
-    ├── shared/           # UI Components, hooks và utils dùng chung (BottomNav, TopHeader)
+    ├── core/             # Thiết lập lõi toàn cục (HTTP Client, Dependency Registry)
+    ├── shared/           # Components, Hooks, Providers dùng chung (DIProvider, QueryProvider)
     └── modules/          # Các phân hệ nghiệp vụ chính (chat, diagnostics, handbook)
         ├── domain/       # Tầng trung tâm (Core)
-        │   ├── entities/   # Các object, type định nghĩa hình dáng dữ liệu
-        │   └── interfaces/ # Các hợp đồng (contracts) cho API / Repository
-        ├── application/  # Logic ứng dụng, Use Cases (Zustand Stores, React Query hooks)
+        │   ├── models/     # Các object, type định nghĩa hình dáng dữ liệu
+        │   └── repositories/ # Các hợp đồng (contracts) cho Interface
         ├── infrastructure/ # Giao tiếp API, implement các interfaces từ domain
-        └── presentation/ # UI Components chuyên biệt của module (chỉ render UI)
+        └── presentation/ # Tầng Hiển thị (Components, Hooks, Zustand Stores)
 ```
 
 ---

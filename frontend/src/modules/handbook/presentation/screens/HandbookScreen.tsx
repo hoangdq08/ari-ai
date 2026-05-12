@@ -2,14 +2,13 @@
 
 import { Search, Loader2 } from "lucide-react";
 import { KnowledgeCard } from "../components/KnowledgeCard";
-import { useHandbookStore } from "../../application/useHandbookStore";
-import { useArticles } from "../../application/useArticles";
-import { CATEGORIES } from "../../domain/entities/Article";
-import { handbookApi } from "../../infrastructure/handbook.api";
+import { useHandbookStore } from "../stores/useHandbookStore";
+import { useArticles } from "../hooks/useArticles";
+import { CATEGORIES } from "../../domain/models/Article";
 
 export function HandbookScreen() {
   const { searchQuery, activeCategory, setSearchQuery, setActiveCategory } = useHandbookStore();
-  const { data: articles, isLoading } = useArticles(handbookApi);
+  const { data: articles, isLoading } = useArticles();
 
   return (
     <div className="flex flex-col min-h-full pb-24">

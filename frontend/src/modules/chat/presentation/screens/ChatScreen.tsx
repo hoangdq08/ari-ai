@@ -5,12 +5,10 @@ import { createPortal } from "react-dom";
 import { Eraser } from "lucide-react";
 import { ChatBubble } from "../components/ChatBubble";
 import { ChatInput } from "../components/ChatInput";
-import { useChatStore } from "../../application/useChatStore";
+import { useChat } from "../hooks/useChat";
 
 export function ChatScreen() {
-  const messages = useChatStore((state) => state.messages);
-  const isTyping = useChatStore((state) => state.isTyping);
-  const clearChat = useChatStore((state) => state.clearChat);
+  const { messages, isTyping, clearChat } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [headerActionsNode, setHeaderActionsNode] = useState<HTMLElement | null>(null);
 
