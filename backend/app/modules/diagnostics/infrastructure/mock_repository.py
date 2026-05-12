@@ -1,7 +1,7 @@
-from ..domain.interfaces import IDiagnosticsRepository
-from ..domain.entities import DiagnosticResultEntity
+from ..domain.repositories import DiagnosticsRepository
+from ..domain.models import DiagnosticResultEntity
 
-class MockDiagnosticsRepository(IDiagnosticsRepository):
+class MockDiagnosticsRepository(DiagnosticsRepository):
     def analyze_image(self, file_bytes: bytes, filename: str) -> DiagnosticResultEntity:
         # Mock logic trả về kết quả giả lập
         return DiagnosticResultEntity(

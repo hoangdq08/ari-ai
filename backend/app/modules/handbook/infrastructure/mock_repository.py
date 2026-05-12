@@ -1,6 +1,6 @@
 from typing import List
-from ..domain.interfaces import IHandbookRepository
-from ..domain.entities import ArticleEntity
+from ..domain.repositories import HandbookRepository
+from ..domain.models import ArticleEntity
 
 MOCK_ARTICLES = [
     ArticleEntity(id="1", title="Phòng trừ bệnh đạo ôn hại lúa vụ Đông Xuân", content="Hướng dẫn nhận biết sớm vết bệnh hình mắt én trên lá và cách sử dụng thuốc đặc trị an toàn.", category="Lúa Gạo"),
@@ -9,7 +9,7 @@ MOCK_ARTICLES = [
     ArticleEntity(id="4", title="Lịch gieo sạ lúa vùng Đồng bằng sông Cửu Long", content="Cập nhật lịch thời vụ mới nhất từ Bộ NN&PTNT để né rầy và ngập mặn.", category="Thời vụ"),
 ]
 
-class MockHandbookRepository(IHandbookRepository):
+class MockHandbookRepository(HandbookRepository):
     def search_articles(self, query: str, category: str = "Tất cả", limit: int = 5) -> List[ArticleEntity]:
         filtered = MOCK_ARTICLES
         

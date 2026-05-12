@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from .entities import DiagnosticResultEntity
+from .models import DiagnosticResultEntity
 
-class IDiagnosticsRepository(ABC):
+class DiagnosticsRepository(ABC):
     @abstractmethod
     def analyze_image(self, file_bytes: bytes, filename: str) -> DiagnosticResultEntity:
         pass

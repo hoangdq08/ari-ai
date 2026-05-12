@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional
-from .entities import ChatResponseEntity, TranscribeResponseEntity
+from .models import ChatResponseEntity, TranscribeResponseEntity
 
-class IChatProvider(ABC):
+class ChatRepository(ABC):
     @abstractmethod
     def send_message(self, message: str, session_id: Optional[str] = None) -> ChatResponseEntity:
         pass

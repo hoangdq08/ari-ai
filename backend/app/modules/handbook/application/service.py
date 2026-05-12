@@ -1,9 +1,9 @@
 from typing import List
-from ..domain.interfaces import IHandbookRepository
-from ..domain.entities import ArticleEntity
+from ..domain.repositories import HandbookRepository
+from ..domain.models import ArticleEntity
 
 class HandbookService:
-    def __init__(self, repository: IHandbookRepository):
+    def __init__(self, repository: HandbookRepository):
         self._repository = repository
         
     def search_articles(self, query: str, category: str = "Tất cả", limit: int = 5) -> List[ArticleEntity]:

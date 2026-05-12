@@ -1,16 +1,16 @@
 from fastapi import Depends
-from .mock_repository import MockHandbookRepository
-from ..domain.interfaces import IHandbookRepository
-from ..application.service import HandbookService
+from .infrastructure.mock_repository import MockHandbookRepository
+from .domain.repositories import HandbookRepository
+from .application.service import HandbookService
 
-def get_handbook_repository() -> IHandbookRepository:
+def get_handbook_repository() -> HandbookRepository:
     """
     Trả về instance của Repository (có thể tráo đổi thành ChromaDB ở đây)
     """
     return MockHandbookRepository()
 
 def get_handbook_service(
-    repository: IHandbookRepository = Depends(get_handbook_repository)
+    repository: HandbookRepository = Depends(get_handbook_repository)
 ) -> HandbookService:
     """
     Khởi tạo và trả về Application Service với Dependency Injection

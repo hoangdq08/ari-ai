@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:8080", "http://127.0.0.1:8080"]
 
     class Config:
+        extra = "ignore"
         # Hỗ trợ đọc .env ở cả thư mục hiện tại và thư mục gốc
         env_file = (".env", "../.env")
 

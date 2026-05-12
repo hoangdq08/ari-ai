@@ -32,20 +32,24 @@ flowchart TD
     
     P["🖥️ Presentation Layer<br/>(FastAPI Routes / Controllers)"]:::presentation
     A["⚙️ Application Layer<br/>(Use Cases / Services)"]:::application
+    D["🧱 Domain Layer<br/>(Models / Repositories)"]:::domain
     I["🌐 Infrastructure Layer<br/>(DB / AI Models / Faster-Whisper)"]:::infra
-    D["🧱 Domain Layer<br/>(Entities / Interfaces)"]:::domain
+    C["⚙️ Core / DI<br/>(Composition Root / Dependencies)"]:::core
     
-    P == "1. Gọi Use Case" ==> A
-    A -. "4. Trả kết quả" .-> P
+    C -. "1. Khởi tạo & Inject" .-> P
+    C -. "1. Khởi tạo & Inject" .-> A
+    C -. "1. Khởi tạo & Quản lý" .-> I
     
-    A == "2. Gọi Interface" ==> I
-    I -. "3. Trả Domain Entity" .-> A
+    P -- "2. Gọi Use Case" --> A
+    A -- "3. Gọi hàm (Chỉ biết Interface)" --> D
+    I -. "4. Thực thi (Implements Interface)" .-> D
     
-    I == "Giao tiếp AI/DB" ==> External[("☁️ Gemini API / ChromaDB")]
+    I == "5. Giao tiếp AI/DB" ==> External[("☁️ Gemini API / ChromaDB")]
     
-    P -. "Phụ thuộc" .-> D
-    A -. "Phụ thuộc" .-> D
-    I -. "Phụ thuộc (Implement)" .-> D
+    %% Chú thích Dependency Rule
+    P -. "Phụ thuộc chiều xuôi" .-> A
+    A -. "Phụ thuộc chiều xuôi" .-> D
+    I -. "Phụ thuộc đảo ngược (DIP)" .-> D
 ```
 
 ### 2. Cây thư mục (Directory Tree)
@@ -56,13 +60,17 @@ Dự án áp dụng chia tách theo các miền nghiệp vụ (Domains), giúp m
 backend/
 ├── app/
 │   ├── main.py                    # Lớp Framework (Khởi chạy FastAPI, cấu hình CORS & Routers)
-│   ├── core/                      # Thiết lập lõi toàn cục (Config Env, Dependency Injection)
-│   ├── shared/                    # Error Handlers, HTTP Clients, Interface dùng chung
+│   ├── core/                      # Thiết lập lõi toàn cục (Config Env)
+│   ├── shared/                    # Các thành phần dùng chung toàn cục
+│   │   ├── infrastructure/        # (VD: Khởi tạo Vector DB client)
+│   │   ├── errors/
+│   │   └── domain/                # Các Interfaces/Models dùng chung toàn cục
 │   └── modules/                   # Các phân hệ nghiệp vụ chính (chat, diagnostics, handbook)
+│       ├── dependencies.py        # (Mới) Lớp Composition Root, tiêm dependencies cho module
 │       ├── domain/
-│       │   ├── entities.py        # Các object, type định nghĩa hình dáng dữ liệu
-│       │   └── interfaces.py      # Các hợp đồng (contracts) cho Repository / API ngoài
-│       ├── application/           # Logic ứng dụng, Use Cases
+│       │   ├── models.py          # Định nghĩa hình dáng dữ liệu (Domain Models)
+│       │   └── repositories.py    # Các hợp đồng (contracts/interfaces) cho Repository
+│       ├── application/           # Logic ứng dụng, Use Cases (Services)
 │       ├── infrastructure/        # Giao tiếp Database, AI Models, DTOs, Mappers
 │       └── presentation/          # FastAPI Routes (Controllers) chuyên biệt của module
 │

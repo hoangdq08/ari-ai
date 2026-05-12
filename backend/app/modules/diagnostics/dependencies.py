@@ -1,9 +1,9 @@
 from fastapi import Depends
-from .mock_repository import MockDiagnosticsRepository
-from ..domain.interfaces import IDiagnosticsRepository
-from ..application.service import DiagnosticsService
+from .infrastructure.mock_repository import MockDiagnosticsRepository
+from .domain.repositories import DiagnosticsRepository
+from .application.service import DiagnosticsService
 
-def get_diagnostics_repository() -> IDiagnosticsRepository:
+def get_diagnostics_repository() -> DiagnosticsRepository:
     """
     Cung cấp instance của Repository.
     Khi tích hợp model AI thật, ta sẽ đổi MockDiagnosticsRepository thành GeminiVisionRepository.
@@ -11,7 +11,7 @@ def get_diagnostics_repository() -> IDiagnosticsRepository:
     return MockDiagnosticsRepository()
 
 def get_diagnostics_service(
-    repository: IDiagnosticsRepository = Depends(get_diagnostics_repository)
+    repository: DiagnosticsRepository = Depends(get_diagnostics_repository)
 ) -> DiagnosticsService:
     """
     Cung cấp DiagnosticsService thông qua Dependency Injection.

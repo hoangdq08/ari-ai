@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Depends
 from .schemas import ChatMessageRequest, ChatMessageResponse, TranscribeResponse
 from ..application.service import ChatService
-from ..infrastructure.di import get_chat_service
+from ..dependencies import get_chat_service
 
 router = APIRouter()
 

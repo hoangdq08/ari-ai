@@ -1,8 +1,8 @@
 from typing import Optional
-from ..domain.interfaces import IChatProvider
-from ..domain.entities import ChatResponseEntity, TranscribeResponseEntity
+from ..domain.repositories import ChatRepository
+from ..domain.models import ChatResponseEntity, TranscribeResponseEntity
 
-class MockChatProvider(IChatProvider):
+class MockChatRepository(ChatRepository):
     def send_message(self, message: str, session_id: Optional[str] = None) -> ChatResponseEntity:
         return ChatResponseEntity(
             reply=f"[MOCK] Trợ lý Nông Trí AI nhận được câu hỏi: '{message}'. Gợi ý cách xử lý: Phun thuốc X.",

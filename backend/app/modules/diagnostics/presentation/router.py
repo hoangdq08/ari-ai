@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Depends
 from .schemas import DiagnoseResponse
 from ..application.service import DiagnosticsService
-from ..infrastructure.di import get_diagnostics_service
+from ..dependencies import get_diagnostics_service
 
 router = APIRouter()
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query, Depends
 from .schemas import SearchHandbookResponse, SearchResultItem
 from ..application.service import HandbookService
-from ..infrastructure.di import get_handbook_service
+from ..dependencies import get_handbook_service
 
 router = APIRouter()
 

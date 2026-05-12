@@ -1,8 +1,8 @@
-from ..domain.interfaces import IDiagnosticsRepository
-from ..domain.entities import DiagnosticResultEntity
+from ..domain.repositories import DiagnosticsRepository
+from ..domain.models import DiagnosticResultEntity
 
 class DiagnosticsService:
-    def __init__(self, repository: IDiagnosticsRepository):
+    def __init__(self, repository: DiagnosticsRepository):
         self._repository = repository
         
     def analyze_image(self, file_bytes: bytes, filename: str) -> DiagnosticResultEntity:
