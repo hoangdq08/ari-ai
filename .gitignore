@@ -16,6 +16,7 @@ frontend/.next/
 frontend/out/
 frontend/build/
 admin/dist/
+admin/.vite/
 
 # ChromaDB Data
 data/chromadb/
