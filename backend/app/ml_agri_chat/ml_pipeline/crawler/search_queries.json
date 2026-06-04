@@ -1,0 +1,127 @@
+{
+  "text_research_queries": {
+    "source_strategy": {
+      "goal": "Thu thập dữ liệu cà phê sạch, có nguồn rõ, ưu tiên tài liệu chính thống để giảm bias, leakage và nhiễu thương mại.",
+      "priority_order": [
+        "site:khuyennongvn.gov.vn",
+        "site:khuyennongdaklak.com.vn",
+        "site:vaas.vn",
+        "site:vista.gov.vn",
+        "site:tieuchuan.vsqi.gov.vn",
+        "site:moit.gov.vn",
+        "site:fao.org",
+        "site:worldcoffeeresearch.org",
+        "site:globalcoffeeplatform.org"
+      ],
+      "avoid_patterns": [
+        "mua ngay",
+        "bảng giá",
+        "đại lý",
+        "hotline",
+        "shopee",
+        "facebook",
+        "youtube",
+        "tiktok"
+      ]
+    },
+    "official_core": [
+      "site:khuyennongvn.gov.vn kỹ thuật canh tác cà phê bền vững",
+      "site:khuyennongvn.gov.vn tài liệu khuyến nông cà phê PDF",
+      "site:khuyennongdaklak.com.vn kỹ thuật chăm sóc cây cà phê Đắk Lắk",
+      "site:vaas.vn cà phê kỹ thuật sản xuất bền vững PDF",
+      "site:vista.gov.vn cà phê giống năng suất chất lượng cao",
+      "site:tieuchuan.vsqi.gov.vn TCVN cà phê nhân truy xuất nguồn gốc",
+      "site:moit.gov.vn cà phê bền vững xuất khẩu tiêu chuẩn"
+    ],
+    "production_conditions": [
+      "site:vaas.vn điều kiện đất khí hậu cây cà phê Việt Nam",
+      "site:khuyennongvn.gov.vn đất trồng cà phê Tây Nguyên",
+      "site:khuyennongdaklak.com.vn tưới nước cà phê mùa khô Tây Nguyên",
+      "site:vaas.vn biến đổi khí hậu sản xuất cà phê chè Tây Bắc",
+      "site:fao.org coffee climate resilient Vietnam"
+    ],
+    "garden_setup": [
+      "site:khuyennongvn.gov.vn kỹ thuật trồng mới cà phê mật độ khoảng cách",
+      "site:vaas.vn kỹ thuật tái canh cây cà phê",
+      "site:khuyennongdaklak.com.vn phục hồi vườn cà phê già cỗi",
+      "site:vista.gov.vn tái canh cà phê Tây Nguyên",
+      "site:worldcoffeeresearch.org coffee nursery seedling best practices"
+    ],
+    "nutrition_irrigation": [
+      "site:khuyennongvn.gov.vn bón phân cà phê theo giai đoạn",
+      "site:khuyennongdaklak.com.vn chăm sóc cà phê mùa khô tưới nước bón phân",
+      "site:vaas.vn dinh dưỡng cây cà phê phân bón cân đối",
+      "site:khuyennongvn.gov.vn phòng chống hạn cà phê hồ tiêu Tây Nguyên",
+      "site:globalcoffeeplatform.org Vietnam coffee sustainability fertilizer water"
+    ],
+    "plant_protection": [
+      "site:khuyennongvn.gov.vn bệnh gỉ sắt cà phê phòng trừ",
+      "site:khuyennongvn.gov.vn sâu bệnh hại cà phê tuyến trùng rệp sáp",
+      "site:vaas.vn bệnh hại cây cà phê gỉ sắt thán thư",
+      "site:vista.gov.vn cà phê chống chịu sâu bệnh giống",
+      "site:worldcoffeeresearch.org coffee leaf rust disease management"
+    ],
+    "varieties_replanting": [
+      "site:vista.gov.vn giống cà phê TR4 TR9 TRS1",
+      "site:vaas.vn giống cà phê chịu hạn các-bon thấp",
+      "site:khuyennongvn.gov.vn chọn giống cà phê tái canh",
+      "site:khuyennongdaklak.com.vn giống cà phê năng suất cao Đắk Lắk",
+      "site:worldcoffeeresearch.org coffee varieties rust resistant"
+    ],
+    "post_harvest_quality": [
+      "site:khuyennongvn.gov.vn thu hoạch cà phê đúng độ chín",
+      "site:khuyennongvn.gov.vn sơ chế bảo quản cà phê sau thu hoạch",
+      "site:tieuchuan.vsqi.gov.vn TCVN cà phê nhân chất lượng",
+      "site:globalcoffeeplatform.org Vietnam coffee sustainability post harvest",
+      "site:fao.org coffee post harvest quality"
+    ],
+    "standards_market_governance": [
+      "site:tieuchuan.vsqi.gov.vn truy xuất nguồn gốc cà phê TCVN",
+      "site:moit.gov.vn EUDR cà phê Việt Nam bền vững",
+      "site:globalcoffeeplatform.org Vietnam National Sustainability Curriculum coffee",
+      "site:rainforest-alliance.org coffee certification Vietnam",
+      "site:4c-services.org coffee certification Vietnam"
+    ],
+    "ai_ethics_data_quality": [
+      "AI ethics bias fairness robustness explainability agriculture dataset",
+      "data leakage machine learning time split source split RAG evaluation",
+      "counterfactual explanation AI fairness agriculture advisory",
+      "feedback loop bias recommender systems data quality",
+      "class imbalance precision recall F1 agriculture disease detection"
+    ]
+  },
+  "image_queries": {
+    "gi_sat_la_ca_phe": [
+      "gỉ sắt lá cà phê",
+      "gỉ sắt lá cà phê mặt dưới lá vàng cam",
+      "bệnh gỉ sắt cà phê bột cam dưới lá",
+      "coffee leaf rust disease",
+      "coffee leaf rust orange spores underside",
+      "Hemileia vastatrix coffee leaf"
+    ],
+    "dom_mat_cua": [
+      "đốm mắt cua cà phê",
+      "đốm mắt cua cà phê quầng vàng",
+      "bệnh đốm nâu lá cà phê",
+      "cercospora leaf spot coffee",
+      "cercospora coffee yellow halo leaf spot",
+      "Cercospora coffeicola coffee"
+    ],
+    "than_thu": [
+      "thán thư cà phê",
+      "thán thư cà phê vết đen quả",
+      "thán thư lá cà phê hoại tử",
+      "coffee anthracnose disease",
+      "coffee anthracnose dark sunken lesions",
+      "Colletotrichum coffee disease"
+    ],
+    "cay_khoe": [
+      "lá cà phê khỏe",
+      "cây cà phê khỏe lá xanh",
+      "vườn cà phê khỏe",
+      "healthy coffee leaf",
+      "healthy coffee plant leaves",
+      "normal coffee leaf"
+    ]
+  }
+}

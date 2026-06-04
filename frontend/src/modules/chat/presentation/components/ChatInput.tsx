@@ -15,10 +15,12 @@ export function ChatInput() {
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const recognitionRef = useRef<any>(null);
   const startXRef = useRef<number | null>(null);
 
-  const { submitMessage, submitAudio, setTyping, addMessage } = useChat();
+  const { submitMessage, setTyping, addMessage, isTyping } = useChat();
   const diagnoseMutation = useDiagnoseImage();
+  const trimmedText = text.trim();
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -36,8 +38,8 @@ export function ChatInput() {
   }, []);
 
   const handleSendText = (customText?: string) => {
-    const textToSend = customText ?? text;
-    if (!textToSend.trim()) return;
+    const textToSend = (customText ?? text).trim();
+    if (!textToSend || isTyping) return;
 
     if (!customText) setText("");
 
@@ -89,6 +91,16 @@ export function ChatInput() {
     try {
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     } catch (err) { }
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      addMessage({
+        id: Date.now().toString(),
+        role: "ai",
+        content: "Trình duyệt hiện chưa hỗ trợ nhận diện giọng nói. Bà con vui lòng gõ câu hỏi vào ô chat nhé.",
+      });
+      return;
+    }
+
     setShowVoiceTooltip(false);
     setIsRecording(true);
     setRecordingTime(0);
@@ -96,6 +108,32 @@ export function ChatInput() {
     recordingTimerRef.current = setInterval(() => {
       setRecordingTime((prev) => prev + 1);
     }, 1000);
+
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+    recognition.lang = "vi-VN";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event: any) => {
+      const transcript = event.results?.[0]?.[0]?.transcript || "";
+      if (transcript.trim()) {
+        handleSendText(transcript);
+      }
+    };
+    recognition.onerror = () => {
+      addMessage({
+        id: Date.now().toString(),
+        role: "ai",
+        content: "Mình chưa nghe rõ câu hỏi. Bà con thử nói lại gần micro hơn hoặc gõ trực tiếp nhé.",
+      });
+    };
+    recognition.onend = () => {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      setIsRecording(false);
+      setRecordingTime(0);
+      recognitionRef.current = null;
+    };
+    recognition.start();
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
@@ -118,12 +156,7 @@ export function ChatInput() {
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     setIsRecording(false);
 
-    if (recordingTime > 0) {
-      // Gửi một Blob giả (empty audio) để trigger API Transcribe ở Backend thay vì Mock Frontend
-      const fakeAudioBlob = new Blob(["fake-audio-data"], { type: "audio/webm" });
-      submitAudio(fakeAudioBlob);
-    }
-    setRecordingTime(0);
+    recognitionRef.current?.stop();
   };
 
   const handleCancelRecording = (e?: React.PointerEvent) => {
@@ -135,6 +168,8 @@ export function ChatInput() {
     if (!isRecording) return;
 
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    recognitionRef.current?.abort();
+    recognitionRef.current = null;
     setIsRecording(false);
     setRecordingTime(0);
   };
@@ -217,23 +252,29 @@ export function ChatInput() {
                   type="text"
                   value={text}
                   onChange={(e) => setText(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSendText()}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    e.preventDefault();
+                    handleSendText();
+                  }}
                   placeholder="Hỏi chuyên gia AI..."
-                  className="w-full h-[48px] bg-slate-100/80 border-none text-[16px] text-slate-900 rounded-full pl-4 pr-12 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-emerald-500 transition-all placeholder:text-slate-500 font-medium"
+                  className="w-full h-[48px] bg-slate-100/80 border-none text-[16px] text-slate-900 rounded-full pl-4 pr-4 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-emerald-500 transition-all placeholder:text-slate-500 font-medium"
                 />
-                {text.trim() && (
-                  <button
-                    onClick={() => handleSendText()}
-                    className="absolute right-1.5 p-2 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-colors shadow-md active:scale-95"
-                  >
-                    <Send className="w-[20px] h-[20px] ml-0.5" strokeWidth={2.5} />
-                  </button>
-                )}
               </>
             )}
           </div>
 
-          {!text.trim() && (
+          {trimmedText ? (
+            <button
+              type="button"
+              onClick={() => handleSendText()}
+              disabled={isTyping}
+              aria-label="Gửi tin nhắn"
+              className="p-2.5 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-all shadow-sm active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 flex-shrink-0"
+            >
+              <Send className="w-[22px] h-[22px] ml-0.5" strokeWidth={2.5} />
+            </button>
+          ) : (
             <div className="relative">
               {showVoiceTooltip && !isRecording && (
                 <div className="absolute -top-[52px] right-0 bg-slate-800 text-white text-[13px] font-semibold px-4 py-2.5 rounded-2xl whitespace-nowrap animate-bounce shadow-lg after:content-[''] after:absolute after:bottom-[-5px] after:right-[14px] after:w-3 after:h-3 after:bg-slate-800 after:rotate-45">

@@ -8,9 +8,9 @@ export class DiagnosticsApiRepositoryImpl implements DiagnosticsApiRepository {
   constructor(private httpClient: HttpClientRepository) { }
   async diagnoseImage(imageFile: File | Blob): Promise<DiseaseResult> {
     const formData = new FormData();
-    formData.append("image", imageFile);
+    formData.append("file", imageFile);
 
-    const response = await this.httpClient.post<DiagnosticsResponseDTO>("/diagnostics/analyze", formData, {
+    const response = await this.httpClient.post<DiagnosticsResponseDTO>("/ml-agri/diagnose-image", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },

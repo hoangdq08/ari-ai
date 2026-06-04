@@ -1,0 +1,86 @@
+{
+  "text_sources": [
+    {
+      "source_id": "manual_kb_initial",
+      "title": "Nong Tri AI initial manual coffee disease notes",
+      "source_type": "manual",
+      "url": null,
+      "reliability_level": "manual",
+      "language": "vi",
+      "crop": "coffee",
+      "region": "Vietnam",
+      "status": "seeded"
+    }
+  ],
+  "trusted_text_domains": {
+    "official": [
+      "khuyennongvn.gov.vn",
+      "khuyennongdaklak.com.vn",
+      "wasi.org.vn",
+      "wasiv.org.vn",
+      "vaas.vn",
+      "vista.gov.vn",
+      "mard.gov.vn",
+      "tieuchuan.vsqi.gov.vn",
+      "moit.gov.vn",
+      "fao.org",
+      "ico.org",
+      "worldcoffeeresearch.org",
+      "cgiar.org"
+    ],
+    "semi_official": [
+      "vov.vn",
+      "vov1.vov.vn",
+      "tapchicongthuong.vn",
+      "nongnghiep.vn",
+      "coffee.org.vn",
+      "sca.coffee",
+      "rainforest-alliance.org",
+      "4c-services.org"
+    ],
+    "low_trust": [
+      "shopee.vn",
+      "lazada.vn",
+      "tiki.vn",
+      "facebook.com",
+      "youtube.com",
+      "youtu.be",
+      "tiktok.com"
+    ]
+  },
+  "trusted_data_policy": {
+    "auto_approve_reliability": ["official", "semi_official"],
+    "min_quality_for_auto_index": 0.65,
+    "critical_warnings": [
+      "possible_vietnamese_encoding_error",
+      "low_trust_commercial_domain",
+      "commercial_or_vendor_content",
+      "too_much_text_removed",
+      "possible_boilerplate_or_marketing_noise",
+      "high_duplicate_lines",
+      "social_source_too_short_for_rag",
+      "cleaned_text_too_short"
+    ],
+    "default_untrusted_status": "needs_review",
+    "allow_manual_to_index": true
+  },
+  "image_source_policy": {
+    "allowed_url_schemes": ["http", "https"],
+    "allowed_classes": ["gi_sat_la_ca_phe", "dom_mat_cua", "than_thu", "cay_khoe"],
+    "required_manifest_columns": [
+      "class_label",
+      "query",
+      "source_url",
+      "license_note",
+      "source_domain",
+      "notes"
+    ],
+    "default_review_status": "unreviewed"
+  },
+  "reliability_levels": {
+    "official": "Nguồn chính thống: cơ quan nhà nước, viện, trường, tổ chức nông nghiệp uy tín.",
+    "semi_official": "Nguồn kỹ thuật có biên tập: doanh nghiệp, hợp tác xã, tổ chức chuyên môn.",
+    "internet": "Nguồn internet phổ thông, blog, diễn đàn, bài thương mại.",
+    "manual": "Nguồn tự soạn hoặc nhập tay, cần ghi rõ người nhập và ngày nhập nếu dùng thật."
+  }
+}

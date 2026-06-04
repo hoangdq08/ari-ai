@@ -1,4 +1,5 @@
 export interface ChatMessageRequestDTO {
-  message: string;
+  question: string;
+  top_k?: number;
   session_id?: string;
 }

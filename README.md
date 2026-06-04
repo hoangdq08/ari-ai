@@ -106,12 +106,14 @@ ArgiAI/
 │   └── src/
 │       ├── core/         # Lõi hệ thống (Cấu hình, HTTP client)
 │       └── modules/      # Các Domain nghiệp vụ (chat, diagnostics, handbook)
+├── admin/                # 🛠️ Giao diện quản trị dữ liệu/RAG/ops (Vite + React)
 │
 ├── backend/              # ⚙️ Hệ thống API Server (FastAPI + Clean Architecture)
 │   ├── app/
 │   │   ├── core/         # Lõi hệ thống (Config env, Dependency Injection)
-│   │   └── modules/      # Các Domain nghiệp vụ (chat, diagnostics, handbook)
-│   │       └── domain/   # Chứa trực tiếp entities.py và interfaces.py
+│   │   ├── modules/      # Các Domain nghiệp vụ (chat, diagnostics, handbook)
+│   │   │   └── domain/   # Chứa trực tiếp entities.py và interfaces.py
+│   │   └── ml_agri_chat/ # Runtime ML-Agri-Chat tích hợp cho admin/RAG/crawl/ops
 │   └── requirements.txt  # Thư viện Python
 │
 ├── docker-compose.yml    # File cấu hình chạy toàn bộ hệ thống
@@ -128,6 +130,7 @@ ArgiAI/
 
 ### Yêu cầu duy nhất
 - Máy tính của bạn đã cài đặt [Docker Desktop](https://www.docker.com/products/docker-desktop/) (hoặc Docker Engine).
+- Backend runtime chuẩn của dự án là **Python 3.11**. Repo đã có `.python-version` để các công cụ như pyenv/asdf tự chọn đúng version khi cần chạy local.
 
 ### Các bước khởi chạy
 
@@ -146,7 +149,29 @@ docker compose up -d --build
 ### Truy cập hệ thống
 Sau khi Docker hoàn tất việc khởi động, bạn có thể truy cập dự án thông qua trình duyệt:
 - 📱 **Giao diện Web Nông dân**: [http://localhost:8080](http://localhost:8080)
+- 🛠️ **Giao diện Admin**: [http://localhost:8082](http://localhost:8082)
 - ⚙️ **Hệ thống API (Swagger Docs)**: [http://localhost:8081/docs](http://localhost:8081/docs)
+
+### Các nhóm chức năng chính
+
+- **Ứng dụng nông dân (`frontend/`)**: chat, chẩn đoán ảnh, cẩm nang. Phần này dùng API chuẩn hiện tại dưới `/api/v1/chat`, `/api/v1/diagnostics`, `/api/v1/handbook`.
+- **Admin vận hành (`admin/`)**: dashboard dữ liệu, research/crawl nguồn, ops console, báo cáo RAG. Admin gọi backend qua `/api/v1/ml-agri`.
+- **Backend lõi (`backend/app/modules/`)**: các module DDD hiện có của dự án.
+- **Backend ML-Agri tích hợp (`backend/app/ml_agri_chat/`)**: các năng lực được đưa từ `ML-Agri-Chat`, gồm RAG fallback, ingest/crawl tài liệu, data quality, ops events, diagnose image placeholder và bộ dữ liệu mẫu.
+
+### Lưu ý backend local
+
+Backend nên chạy bằng Docker để tránh lệch version Python/native package giữa các máy. Nếu cần chạy local, bắt buộc tạo virtualenv bằng Python 3.11:
+
+```bash
+cd backend
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 127.0.0.1 --port 8081
+```
+
+Không dùng Python 3.14 cho backend hiện tại vì một số package native như `pydantic-core`, `Pillow`, `chromadb` có thể không cài được theo lock hiện tại. Khi thiếu dependency, backend chỉ bật chế độ admin read-only fallback để giao diện không chết fetch; trạng thái chuẩn khi chạy đúng môi trường phải là `status: "ok"` tại `/api/v1/ml-agri/health`.
 
 *Lưu ý: Để dừng hệ thống một cách an toàn, sử dụng lệnh: `docker compose down`.*
 

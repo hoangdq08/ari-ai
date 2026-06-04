@@ -8,7 +8,14 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     
     # CORS
-    BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:8080", "http://127.0.0.1:8080"]
+    BACKEND_CORS_ORIGINS: list[str] = [
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "http://localhost:8082",
+        "http://127.0.0.1:8082",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
 
     class Config:
         extra = "ignore"
