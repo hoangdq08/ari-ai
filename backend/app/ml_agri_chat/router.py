@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-import json
 import csv
+import hashlib
+import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from app.ml_agri_chat.modules.clean_img import validate_image_quality
@@ -25,6 +27,7 @@ from app.ml_agri_chat.modules.source_policy import source_review_decision, sourc
 from app.ml_agri_chat.modules.taxonomy import CATEGORY_MAP, classify_query, enrich_metadata_with_taxonomy, is_vague_disease_question, taxonomy_payload
 from app.ml_agri_chat.modules.text_cleaning import clean_text
 from app.ml_agri_chat.modules.vision_model import CoffeeVisionClassifier, VisionPrediction
+from app.shared.upload import max_document_bytes, max_image_bytes, read_upload_capped
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -53,7 +56,34 @@ classifier = CoffeeVisionClassifier(ML_PIPELINE_DIR / "models" / "coffee_disease
 CRAWL_EVENTS: list[dict] = []
 ACTIVITY_EVENTS: list[dict] = []
 
+# In-memory event ring buffers — capped to prevent memory leak (see audit C10).
+MAX_CRAWL_EVENTS = int(os.getenv("NONGTRI_MAX_CRAWL_EVENTS", "500"))
+MAX_ACTIVITY_EVENTS = int(os.getenv("NONGTRI_MAX_ACTIVITY_EVENTS", "1000"))
+
+# Upload size limits resolved once at import; tweak via env vars.
+MAX_IMAGE_BYTES = max_image_bytes()
+MAX_DOCUMENT_BYTES = max_document_bytes()
+
 router = APIRouter()
+
+
+def require_admin_token(x_admin_token: Optional[str] = Header(default=None)) -> None:
+    """Simple admin auth via shared secret in `X-Admin-Token` header.
+
+    If `NONGTRI_ADMIN_TOKEN` is unset, admin endpoints are disabled (return 503)
+    to fail closed by default. Set it in env to enable.
+    """
+    expected = os.getenv("NONGTRI_ADMIN_TOKEN", "").strip()
+    if not expected:
+        raise HTTPException(status_code=503, detail="Admin endpoints are disabled (NONGTRI_ADMIN_TOKEN unset).")
+    if not x_admin_token or x_admin_token.strip() != expected:
+        raise HTTPException(status_code=401, detail="Invalid or missing X-Admin-Token.")
+
+
+def _short_hash(value: str) -> str:
+    """Return a short fingerprint for log correlation without exposing content."""
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
+
 
 class ChatHistoryMessage(BaseModel):
     role: str = Field(pattern="^(user|assistant|ai)$")
@@ -191,8 +221,11 @@ def chat(payload: ChatRequest) -> dict:
         "received",
         "User chat request received",
         {
-            "question": payload.question[:240],
-            "effective_question": effective_question[:240],
+            # Privacy: do not log raw question content. Surface only length + hash so we can
+            # correlate without persisting PII (place names, farmer names) into ACTIVITY_EVENTS.
+            "question_length": len(payload.question),
+            "question_hash": _short_hash(payload.question),
+            "effective_question_hash": _short_hash(effective_question),
             "top_k": payload.top_k,
             "session_id": payload.session_id,
             "history_count": len(conversation_history),
@@ -256,7 +289,7 @@ def chat(payload: ChatRequest) -> dict:
     return {**answer, "routing": route, "session_id": payload.session_id}
 
 
-@router.post("/ingest-document")
+@router.post("/ingest-document", dependencies=[Depends(require_admin_token)])
 async def ingest_document(
     file: UploadFile = File(...),
     source_type: str = Form("manual"),
@@ -268,7 +301,7 @@ async def ingest_document(
     if reliability_level not in {"official", "semi_official", "internet", "manual"}:
         raise HTTPException(status_code=400, detail="Invalid reliability_level.")
 
-    file_bytes = await file.read()
+    file_bytes = await read_upload_capped(file, MAX_DOCUMENT_BYTES, "Document")
     if not file_bytes:
         raise HTTPException(status_code=400, detail="File is empty.")
 
@@ -296,7 +329,7 @@ async def ingest_document(
     return {"request_id": request_id, **result}
 
 
-@router.post("/ingest-url")
+@router.post("/ingest-url", dependencies=[Depends(require_admin_token)])
 def ingest_url(payload: IngestUrlRequest) -> dict:
     request_id = str(uuid4())
     log = get_request_logger(request_id)
@@ -327,7 +360,7 @@ def ingest_url(payload: IngestUrlRequest) -> dict:
     return {"request_id": request_id, **result}
 
 
-@router.post("/crawl-urls")
+@router.post("/crawl-urls", dependencies=[Depends(require_admin_token)])
 def crawl_urls(payload: CrawlUrlsRequest) -> dict:
     request_id = str(uuid4())
     log = get_request_logger(request_id)
@@ -434,7 +467,7 @@ def crawl_urls(payload: CrawlUrlsRequest) -> dict:
     }
 
 
-@router.post("/research-search")
+@router.post("/research-search", dependencies=[Depends(require_admin_token)])
 def research_search(payload: ResearchSearchRequest) -> dict:
     request_id = str(uuid4())
     log = get_request_logger(request_id)
@@ -527,7 +560,7 @@ def research_search(payload: ResearchSearchRequest) -> dict:
     }
 
 
-@router.post("/research-batch")
+@router.post("/research-batch", dependencies=[Depends(require_admin_token)])
 def research_batch(payload: ResearchBatchRequest) -> dict:
     request_id = str(uuid4())
     topics = [_normalize_topic(item) for item in payload.queries]
@@ -677,7 +710,7 @@ def crawl_events(limit: int = 120) -> dict:
     return {"events": CRAWL_EVENTS[-max(1, min(limit, 2000)) :]}
 
 
-@router.get("/admin/ops-events")
+@router.get("/admin/ops-events", dependencies=[Depends(require_admin_token)])
 def admin_ops_events(limit: int = 200) -> dict:
     bounded_limit = max(1, min(limit, 500))
     return {
@@ -686,7 +719,7 @@ def admin_ops_events(limit: int = 200) -> dict:
     }
 
 
-@router.post("/admin/reset-rag-data")
+@router.post("/admin/reset-rag-data", dependencies=[Depends(require_admin_token)])
 def reset_rag_data(payload: ResetDataRequest) -> dict:
     for directory in [RAW_DIR, CLEANED_DIR, CHUNKS_DIR, VECTOR_DIR, CRAWL_CANDIDATE_DIR]:
         _clear_directory(directory)
@@ -727,7 +760,7 @@ def rag_evaluate(payload: RagEvaluateRequest) -> dict:
     return evaluate_retrieval_cases(cases, rag, top_k=payload.top_k)
 
 
-@router.post("/rag-rebuild-index")
+@router.post("/rag-rebuild-index", dependencies=[Depends(require_admin_token)])
 def rag_rebuild_index() -> dict:
     chunk_dicts: list[dict] = []
     held_files: list[str] = []
@@ -822,7 +855,7 @@ def feedback(payload: FeedbackRequest) -> dict[str, str]:
 async def diagnose_image(file: UploadFile = File(...)) -> dict:
     request_id = str(uuid4())
     log = get_request_logger(request_id)
-    image_bytes = await file.read()
+    image_bytes = await read_upload_capped(file, MAX_IMAGE_BYTES, "Image")
     if not image_bytes:
         raise HTTPException(status_code=400, detail="Image file is empty.")
 
@@ -1110,8 +1143,8 @@ def _log_crawl_event(request_id: str, event: dict) -> None:
         event.get("title") or event.get("url") or event.get("source_id") or "Crawler event",
         {key: value for key, value in event.items() if key not in {"title"}},
     )
-    if len(CRAWL_EVENTS) > 5000:
-        del CRAWL_EVENTS[: len(CRAWL_EVENTS) - 5000]
+    if len(CRAWL_EVENTS) > MAX_CRAWL_EVENTS:
+        del CRAWL_EVENTS[: len(CRAWL_EVENTS) - MAX_CRAWL_EVENTS]
 
 
 def _log_activity(request_id: str, stream: str, event: str, message: str, payload: dict | None = None) -> None:
@@ -1125,8 +1158,8 @@ def _log_activity(request_id: str, stream: str, event: str, message: str, payloa
             "payload": payload or {},
         }
     )
-    if len(ACTIVITY_EVENTS) > 1000:
-        del ACTIVITY_EVENTS[: len(ACTIVITY_EVENTS) - 1000]
+    if len(ACTIVITY_EVENTS) > MAX_ACTIVITY_EVENTS:
+        del ACTIVITY_EVENTS[: len(ACTIVITY_EVENTS) - MAX_ACTIVITY_EVENTS]
 
 
 def _ops_pipeline_status() -> dict:

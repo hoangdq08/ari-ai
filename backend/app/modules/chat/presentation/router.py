@@ -1,4 +1,7 @@
-from fastapi import APIRouter, UploadFile, File, Depends
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+
+from app.shared.upload import max_audio_bytes, read_upload_capped
+
 from .schemas import ChatMessageRequest, ChatMessageResponse, TranscribeResponse
 from ..application.service import ChatService
 from ..dependencies import get_chat_service
@@ -13,9 +16,11 @@ async def transcribe_audio(
     """
     Chuyển đổi file âm thanh (giọng nói) thành văn bản (Speech-to-Text).
     """
-    file_bytes = await file.read()
+    file_bytes = await read_upload_capped(file, max_audio_bytes(), "Audio")
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Audio file is empty.")
     filename = file.filename or "audio.webm"
-    
+
     result = chat_service.transcribe_audio(file_bytes=file_bytes, filename=filename)
     return TranscribeResponse(text=result.text)
 

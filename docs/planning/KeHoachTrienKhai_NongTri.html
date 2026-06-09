@@ -227,7 +227,7 @@
         </div>
 
         <!-- SECTION 3 -->
-        <h2>2️⃣ Phân Tích 5 Trục AI (Báo Cáo Điểm)</h2>
+        <h2>2️⃣ Phân Tích 6 Trục AI (Báo Cáo Điểm)</h2>
         <div class="grid">
             <div class="feature-box" style="border-left: 4px solid #ef4444;">
                 <h3 style="color: #b91c1c;">🛡️ Robustness (Bền bỉ / Chống lỗi)</h3>
@@ -239,29 +239,43 @@
             <div class="feature-box" style="border-left: 4px solid #10b981;">
                 <h3 style="color: #047857;">📈 Reliability (Độ tin cậy)</h3>
                 <p>Khắc phục điểm yếu "ảo giác" (hallucination) của AI thông thường bằng kiến trúc <span
-                        class="accent-text">RAG</span>. Hệ thống không bịa kiến thức mà chỉ trích xuất từ Cẩm nang bảo
-                    vệ thực vật chính thống của Bộ NN&PTNT.</p>
+                        class="accent-text">RAG</span>. Hệ thống chỉ trích xuất từ kho cẩm nang bảo vệ thực vật đã
+                    crawl từ các nguồn chính thống như <span class="accent-text">mard.gov.vn, khuyennongvn.gov.vn,
+                        wasi.org.vn, vaas.vn</span>, kết hợp module <span class="accent-text">source_policy</span>
+                    chấm điểm tin cậy theo whitelist và loại các nguồn thương mại/mạng xã hội.</p>
             </div>
 
             <div class="feature-box" style="border-left: 4px solid #8b5cf6;">
                 <h3 style="color: #6d28d9;">🔍 Explainability (Minh bạch)</h3>
-                <p>Mỗi khi hệ thống chẩn đoán "bệnh đạo ôn" qua hình ảnh, LLM bắt buộc kết xuất chuỗi thông báo giải
-                    thích vì sao, đi kèm nguồn gốc. VD: <span class="accent-text">"...dựa trên đốm xám mắt én (Căn cứ
-                        Cẩm Nang Lúa Gạo - Tr.15)"</span>.</p>
+                <p>Mỗi câu trả lời đều kèm danh sách <span class="accent-text">tiêu đề nguồn, URL, độ tin cậy
+                        (reliability_level)</span> của các chunk RAG được dùng làm căn cứ, cộng với mức độ tự tin của
+                    hệ thống. VD: <span class="accent-text">"...dấu hiệu khớp mô tả gỉ sắt lá cà phê (Nguồn:
+                        khuyennongvn.gov.vn, official)"</span>.</p>
             </div>
 
             <div class="feature-box" style="border-left: 4px solid #ec4899;">
                 <h3 style="color: #be185d;">⚖️ Bias & Fairness (Công bằng)</h3>
-                <p>Chống thiên vị học thức và vùng miền. Người mù chữ, kém công nghệ hoặc nói phương ngữ địa phương trọ
-                    trẹ vẫn dùng được thông qua hệ thống dịch ngôn ngữ <span class="accent-text">Voice-to-Text đa vùng
-                        miền</span>.</p>
+                <p>Chống thiên vị học thức và vùng miền. UI mobile-first với <span class="accent-text">nút bấm cỡ lớn,
+                        icon trực quan</span> và đầu vào bằng hình ảnh giúp người mù chữ hoặc kém công nghệ vẫn dùng được.
+                    Lộ trình tiếp theo: bổ sung <span class="accent-text">Voice-to-Text đa vùng miền</span>
+                    (Faster-Whisper) để hỗ trợ người nói phương ngữ.</p>
             </div>
 
             <div class="feature-box" style="border-left: 4px solid #3b82f6;">
                 <h3 style="color: #1d4ed8;">🤝 Social Impact (Tác động xã hội)</h3>
-                <p>Không dùng AI giám sát đắt đỏ cho tài phiệt làm farm, dự án tập trung làm App <span
-                        class="accent-text">cứu sinh kế cho nông dân nhỏ lẻ</span>, thay thế chuyên gia tư vấn tại chỗ
-                    với chi phí 0đ, đặc biệt hữu ích cho đồng bào khó khăn.</p>
+                <p>Khác với các giải pháp agritech enterprise tập trung phục vụ trang trại quy mô lớn, dự án ưu tiên
+                    <span class="accent-text">hỗ trợ sinh kế cho nông dân nhỏ lẻ</span>: cung cấp kênh tư vấn ban đầu
+                    chi phí 0đ khi người dân chưa tiếp cận được chuyên gia khuyến nông, đặc biệt hữu ích cho đồng bào
+                    vùng sâu vùng xa.</p>
+            </div>
+
+            <div class="feature-box" style="border-left: 4px solid #0ea5e9;">
+                <h3 style="color: #0369a1;">🔒 Privacy (Quyền riêng tư)</h3>
+                <p>Toàn bộ pipeline lõi chạy <span class="accent-text">cục bộ trong môi trường tự host</span>: LLM
+                    văn bản qua Ollama (qwen2.5), phân loại bệnh qua mô hình thị giác Keras nội bộ, vector store
+                    ChromaDB local. Dữ liệu hội thoại và ảnh ruộng không gửi ra dịch vụ AI bên thứ ba. Áp dụng
+                    nguyên tắc <span class="accent-text">data minimization</span>: chỉ thu thập tối thiểu, ẩn danh
+                    PII trước khi log, người dùng có quyền xóa lịch sử bất cứ lúc nào.</p>
             </div>
         </div>
 

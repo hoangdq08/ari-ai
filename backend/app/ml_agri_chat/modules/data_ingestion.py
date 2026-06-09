@@ -4,6 +4,7 @@ import hashlib
 import json
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -162,17 +163,13 @@ class DataIngestor:
 
 
 def _extract_pdf(file_bytes: bytes) -> str:
-    temp_path = Path("/private/tmp") / f"nong_tri_{_source_id(str(len(file_bytes)))}.pdf"
-    temp_path.write_bytes(file_bytes)
-    reader = PdfReader(str(temp_path))
+    reader = PdfReader(BytesIO(file_bytes))
     pages = [page.extract_text() or "" for page in reader.pages]
     return "\n\n".join(pages)
 
 
 def _extract_docx(file_bytes: bytes) -> str:
-    temp_path = Path("/private/tmp") / f"nong_tri_{_source_id(str(len(file_bytes)))}.docx"
-    temp_path.write_bytes(file_bytes)
-    document = Document(str(temp_path))
+    document = Document(BytesIO(file_bytes))
     return "\n".join(paragraph.text for paragraph in document.paragraphs)
 
 
