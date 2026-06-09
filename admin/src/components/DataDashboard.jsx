@@ -202,7 +202,13 @@ export default function DataDashboard({ apiBase }) {
   const sourceList = quality?.sources || [];
   const avgQuality = summary.source_count ? Math.round((summary.avg_quality_score || 0) * 100) : null;
   const warningTotal = Object.values(summary.warning_counts || {}).reduce((sum, value) => sum + Number(value || 0), 0);
-  const indexGap = Math.abs((summary.vector_chunk_count || 0) - (summary.chunk_count || 0));
+  // Backend now exposes `real_index_drift` = abs(chunks_indexable - vector_chunks),
+  // i.e. only the gap that the source review policy did NOT intend to leave.
+  // Earlier this dashboard subtracted total chunks from vector chunks and
+  // surfaced "Lệch N chunk" for chunks that were correctly held/blocked by
+  // the quality gate, which made everything look broken on day-1 demos.
+  // Falling back to the abs() formula keeps older API clients working.
+  const indexGap = summary.real_index_drift ?? Math.abs((summary.vector_chunk_count || 0) - (summary.chunks_indexable || summary.chunk_count || 0));
   const approvedCount = summary.review_status_counts?.approved || 0;
   const heldCount = summary.indexing_status_counts?.held_for_review || 0;
   const blockedCount = summary.indexing_status_counts?.blocked || 0;
@@ -279,7 +285,7 @@ export default function DataDashboard({ apiBase }) {
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Metric icon={Database} label="Nguồn RAG" value={summary.source_count ?? "..."} note={`${sources.length || 0} từ API nguồn`} tone="emerald" />
         <Metric icon={FileSearch} label="Nguồn đã duyệt" value={approvedCount} note={`${heldCount} giữ review · ${blockedCount} chặn`} tone={heldCount || blockedCount ? "amber" : "emerald"} />
-        <Metric icon={Layers3} label="Chỉ mục vector" value={summary.vector_chunk_count ?? "..."} note={indexGap ? `Lệch ${indexGap} chunk` : "Đồng bộ"} tone={indexGap > 10 ? "amber" : "slate"} />
+        <Metric icon={Layers3} label="Chỉ mục vector" value={summary.vector_chunk_count ?? "..."} note={indexGap ? `Lệch ${indexGap} chunk so với đã duyệt` : "Đồng bộ với chunk đã duyệt"} tone={indexGap > 10 ? "amber" : "slate"} />
         <Metric icon={ShieldCheck} label="Nguồn chính thống" value={summary.reliability_counts?.official ?? 0} note={`${warningTotal} cảnh báo dữ liệu`} tone="amber" />
       </section>
 
@@ -288,13 +294,18 @@ export default function DataDashboard({ apiBase }) {
           <div className="grid gap-3 md:grid-cols-4">
             <QualityLine label="Tài liệu thô" value={summary.source_count ?? 0} active={Boolean(summary.source_count)} />
             <QualityLine label="Text sạch" value={sourceList.filter((item) => (item.cleaned_char_count || 0) > 0).length} active={sourceList.some((item) => (item.cleaned_char_count || 0) > 0)} />
-            <QualityLine label="Chunk" value={summary.chunk_count ?? 0} active={Boolean(summary.chunk_count)} />
-            <QualityLine label="Được index" value={summary.indexing_status_counts?.indexed ?? 0} active={Boolean(summary.indexing_status_counts?.indexed)} />
+            <QualityLine label="Chunk tổng" value={summary.chunk_count ?? 0} active={Boolean(summary.chunk_count)} />
+            <QualityLine label="Chunk đã duyệt" value={summary.chunks_indexable ?? summary.indexing_status_counts?.indexed ?? 0} active={Boolean(summary.chunks_indexable)} />
           </div>
+          {(summary.chunks_held_for_review || summary.chunks_blocked) ? (
+            <p className="mt-3 text-xs font-semibold text-slate-500">
+              Quality gate: {summary.chunks_held_for_review || 0} chunk chờ review · {summary.chunks_blocked || 0} chunk bị chặn.
+            </p>
+          ) : null}
           {indexGap > 10 && (
             <div className="mt-4 flex gap-2 rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm font-bold text-amber-800">
               <AlertTriangle className="h-5 w-5 flex-shrink-0" />
-              Chỉ mục vector đang lệch so với chunk. Nên tạo lại chỉ mục trước khi demo hoặc đánh giá RAG.
+              Chunk đã duyệt nhưng chưa nằm trong chỉ mục vector. Tạo lại chỉ mục để đồng bộ.
             </div>
           )}
         </Panel>

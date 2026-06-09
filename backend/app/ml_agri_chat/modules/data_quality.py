@@ -63,11 +63,36 @@ def build_data_quality_report(
     source_types = Counter((item["source_type"] or "unknown") for item in source_reports)
     review_status = Counter((item["review_status"] or "unknown") for item in source_reports)
     indexing_status = Counter((item["indexing_status"] or "unknown") for item in source_reports)
+
+    # Split the chunk count by indexing status so dashboards can show the
+    # truth: "indexable" should match `vector_chunk_count`; the rest are
+    # held-for-review or blocked by the source review policy. Without this
+    # split the FE used `abs(vector_chunks - chunks)` and reported a
+    # misleading "lệch N chunk" warning even when the gap is exactly what
+    # the quality gate is designed to produce.
+    chunks_by_indexing_status: Counter[str] = Counter()
+    for item in source_reports:
+        status = item.get("indexing_status") or "unknown"
+        chunks_by_indexing_status[status] += item.get("chunk_count", 0)
+
+    total_chunks = sum(item["chunk_count"] for item in source_reports)
+    chunks_indexable = chunks_by_indexing_status.get("indexed", 0)
+    vector_count = len(real_vector_chunks)
+    # The only number that should ever fire the "lệch" warning is the gap
+    # between what the policy approved and what is actually persisted in
+    # the vector store. Everything else is by design.
+    real_index_drift = abs(chunks_indexable - vector_count)
+
     return {
         "summary": {
             "source_count": len(source_reports),
-            "chunk_count": sum(item["chunk_count"] for item in source_reports),
-            "vector_chunk_count": len(real_vector_chunks),
+            "chunk_count": total_chunks,
+            "vector_chunk_count": vector_count,
+            "chunks_indexable": chunks_indexable,
+            "chunks_held_for_review": chunks_by_indexing_status.get("held_for_review", 0),
+            "chunks_blocked": chunks_by_indexing_status.get("blocked", 0),
+            "chunks_by_indexing_status": dict(chunks_by_indexing_status),
+            "real_index_drift": real_index_drift,
             "avg_quality_score": round(_avg([item["quality_score"] for item in source_reports]), 3),
             "warning_counts": dict(warnings),
             "reliability_counts": dict(reliability),
