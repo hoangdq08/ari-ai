@@ -29,6 +29,8 @@ from app.ml_agri_chat.modules.taxonomy import CATEGORY_MAP, classify_query, enri
 from app.ml_agri_chat.modules.text_cleaning import clean_text
 from app.ml_agri_chat.modules.vision_model import CoffeeVisionClassifier, VisionPrediction
 from app.shared.latency import latency_report as _latency_report
+from app.shared.latency import stage_report as _stage_report
+from app.shared.latency import StageTimer
 from app.shared.rate_limit import (
     DEFAULT_ADMIN_LIMIT,
     DEFAULT_CHAT_LIMIT,
@@ -252,13 +254,15 @@ def chat(request: Request, payload: ChatRequest) -> dict:
             "safety_disclaimer": DISCLAIMER,
         }
 
-    intent_result = intent_classifier.classify(payload.question)
+    with StageTimer("intent") as t_intent:
+        intent_result = intent_classifier.classify(payload.question)
     log.info(
-        "chat_intent label=%s confidence=%.2f source=%s reason=%s",
+        "chat_intent label=%s confidence=%.2f source=%s reason=%s elapsed_ms=%.1f",
         intent_result.label,
         intent_result.confidence,
         intent_result.source,
         intent_result.reason,
+        t_intent.elapsed_ms,
     )
     canned = CascadeIntentClassifier.canned_response(intent_result.label)
     if canned is not None:
@@ -271,6 +275,7 @@ def chat(request: Request, payload: ChatRequest) -> dict:
                 "intent": intent_result.label,
                 "confidence": round(intent_result.confidence, 2),
                 "source": intent_result.source,
+                "intent_ms": round(t_intent.elapsed_ms, 1),
             },
         )
         return {**canned, "intent": intent_result.label, "session_id": payload.session_id}
@@ -288,9 +293,17 @@ def chat(request: Request, payload: ChatRequest) -> dict:
             "routing": route,
             "safety_disclaimer": DISCLAIMER,
         }
-    chunks = rag.retrieve(effective_question, top_k=payload.top_k, category_key=route["category"])
-    answer = advisor.answer_chat(payload.question, chunks, history=conversation_history, effective_question=effective_question)
-    log.info("chat retrieved_source_ids=%s", [c["metadata"]["source_id"] for c in chunks])
+    with StageTimer("retrieval") as t_retrieval:
+        chunks = rag.retrieve(effective_question, top_k=payload.top_k, category_key=route["category"])
+    with StageTimer("advisor") as t_advisor:
+        answer = advisor.answer_chat(payload.question, chunks, history=conversation_history, effective_question=effective_question)
+    log.info(
+        "chat retrieved_source_ids=%s intent_ms=%.1f retrieval_ms=%.1f advisor_ms=%.1f",
+        [c["metadata"]["source_id"] for c in chunks],
+        t_intent.elapsed_ms,
+        t_retrieval.elapsed_ms,
+        t_advisor.elapsed_ms,
+    )
     _log_activity(
         request_id,
         "chat",
@@ -301,6 +314,9 @@ def chat(request: Request, payload: ChatRequest) -> dict:
             "source_count": len(answer.get("sources", [])),
             "confidence_level": answer.get("confidence_level"),
             "category": route,
+            "intent_ms": round(t_intent.elapsed_ms, 1),
+            "retrieval_ms": round(t_retrieval.elapsed_ms, 1),
+            "advisor_ms": round(t_advisor.elapsed_ms, 1),
         },
     )
     return {**answer, "routing": route, "session_id": payload.session_id}
@@ -733,8 +749,11 @@ def admin_ops_events(limit: int = 200) -> dict:
     return {
         "events": ACTIVITY_EVENTS[-bounded_limit:],
         "pipelines": _ops_pipeline_status(),
-        # Slide 13 KPI: latency p50 ≤ 3.0s. Real per-route stats live here.
+        # Slide 13 KPI: latency p50 ≤ 3.0s. Real per-route stats here, and
+        # per-stage breakdown of /chat (intent vs retrieval vs advisor) so
+        # tuning is targeted instead of guessing.
         "latency": _latency_report(),
+        "latency_stages": _stage_report(),
     }
 
 

@@ -27,6 +27,12 @@ from starlette.responses import Response
 
 _BUFFER_SIZE = int(os.getenv("NONGTRI_LATENCY_BUFFER_SIZE", "2000"))
 _samples: Deque[dict[str, Any]] = deque(maxlen=_BUFFER_SIZE)
+# Stage buffer is a separate ring so per-stage timings (intent / retrieval
+# / answer) do not crowd out per-route samples. Sized smaller because each
+# /chat call writes ~3 stage entries; we still want a few thousand chats
+# worth of history for tuning.
+_STAGE_BUFFER_SIZE = int(os.getenv("NONGTRI_LATENCY_STAGE_BUFFER_SIZE", "6000"))
+_stage_samples: Deque[dict[str, Any]] = deque(maxlen=_STAGE_BUFFER_SIZE)
 _lock = RLock()
 
 
@@ -40,6 +46,47 @@ def record_sample(route: str, method: str, duration_ms: float, status_code: int)
                 "status_code": status_code,
             }
         )
+
+
+def record_stage(stage: str, duration_ms: float, *, route: str = "/chat") -> None:
+    """Append a per-stage timing sample.
+
+    Used by the chat endpoint to break down which sub-step (intent
+    classification, retrieval, LLM advisor) dominates the per-request
+    budget. The same percentile machinery in `latency_report()` is reused
+    via `stage_report()`.
+    """
+    with _lock:
+        _stage_samples.append(
+            {
+                "stage": stage,
+                "route": route,
+                "duration_ms": round(duration_ms, 2),
+            }
+        )
+
+
+class StageTimer:
+    """`with StageTimer("intent"):` records elapsed wall-clock on exit.
+
+    No-op if `record` is set to False (e.g. test isolation).
+    """
+
+    def __init__(self, stage: str, *, route: str = "/chat", record: bool = True):
+        self._stage = stage
+        self._route = route
+        self._record = record
+        self._started: float = 0.0
+        self.elapsed_ms: float = 0.0
+
+    def __enter__(self) -> "StageTimer":
+        self._started = time.perf_counter()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.elapsed_ms = (time.perf_counter() - self._started) * 1000.0
+        if self._record:
+            record_stage(self._stage, self.elapsed_ms, route=self._route)
 
 
 def latency_report() -> dict[str, Any]:
@@ -95,6 +142,34 @@ def reset() -> None:
     """Clear all collected samples (used by tests + admin reset path)."""
     with _lock:
         _samples.clear()
+        _stage_samples.clear()
+
+
+def stage_report() -> dict[str, Any]:
+    """Same shape as `latency_report()` but grouped by per-stage labels."""
+    with _lock:
+        snapshot = list(_stage_samples)
+
+    grouped: dict[str, list[float]] = {}
+    for sample in snapshot:
+        grouped.setdefault(sample["stage"], []).append(sample["duration_ms"])
+
+    stages = []
+    for stage, durations in grouped.items():
+        durations_sorted = sorted(durations)
+        stages.append(
+            {
+                "stage": stage,
+                "count": len(durations_sorted),
+                "p50_ms": _percentile(durations_sorted, 50),
+                "p95_ms": _percentile(durations_sorted, 95),
+                "max_ms": durations_sorted[-1],
+            }
+        )
+    return {
+        "samples": len(snapshot),
+        "by_stage": sorted(stages, key=lambda item: -item["count"]),
+    }
 
 
 class LatencyMiddleware(BaseHTTPMiddleware):
@@ -120,6 +195,9 @@ class LatencyMiddleware(BaseHTTPMiddleware):
 __all__ = [
     "LatencyMiddleware",
     "record_sample",
+    "record_stage",
+    "StageTimer",
     "latency_report",
+    "stage_report",
     "reset",
 ]
