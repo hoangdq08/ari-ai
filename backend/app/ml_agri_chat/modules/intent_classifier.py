@@ -314,10 +314,29 @@ JSON:"""
 
 _FOLLOWUP_MARKERS = {
     # Stripped form. Token-aware match to avoid false positives.
+    # Demonstrative / referential ("vậy còn cây kia thì sao"):
     "vay con", "vay thi", "the con", "the nao", "ra sao",
     "roi sao", "roi thi sao", "con cai do", "con loai do",
     "loai do", "cai do", "no thi sao", "vay no",
     "tiep theo", "ke tiep", "tiep tuc",
+    # Confirmation / status check ("ok chưa", "xong chưa", "đúng không")
+    # which only make sense relative to the prior assistant turn. These
+    # were the missing pattern that caused short replies like "chiến chưa?"
+    # to be sent verbatim into RAG and produce off-topic answers.
+    "duoc chua", "xong chua", "ok chua", "oke chua",
+    "dung khong", "phai khong", "co dung khong", "co phai khong",
+    "hieu chua", "ro chua", "ro chuwa", "nam ro chua",
+    "on chua", "chien chua", "chuan chua", "kha thi",
+}
+
+
+# Very short reply tokens whose meaning depends entirely on the prior
+# turn. We match these as whole compact-form strings (not substrings) so
+# longer messages containing the same characters do not trigger.
+_FOLLOWUP_SHORT_REPLIES = {
+    "roi", "vay", "the", "ok", "oke", "u", "uh", "duoc",
+    "chua", "chua a", "the a", "vay a", "the ha", "vay ha",
+    "the sao", "vay sao", "sao",
 }
 
 
@@ -352,10 +371,21 @@ def _is_followup_question(question: str) -> bool:
     compact = _compact(_normalize(question))
     if any(marker in compact for marker in _FOLLOWUP_MARKERS):
         return True
+    # Short confirmation phrasings whose meaning is entirely contextual.
+    # Match the full compact form so "ok" matches "ok" but not the "ok"
+    # buried inside a longer sentence.
+    if compact in _FOLLOWUP_SHORT_REPLIES:
+        return True
     # Very short messages with a deictic pronoun ("vậy nó?", "thế?")
     # almost always reference the prior turn.
     words = compact.split()
     if len(words) <= 3 and any(token in {"vay", "the", "no", "do"} for token in words):
+        return True
+    # "X chua" / "X khong" pattern: short replies (<=3 words) ending with
+    # a yes/no marker are almost always confirmations of the prior turn.
+    # Caught after the substring check above so longer agri questions
+    # like "có nên bón vôi cho cà phê không" still pass through.
+    if len(words) <= 3 and (words and words[-1] in {"chua", "khong", "ha", "a"}):
         return True
     return False
 

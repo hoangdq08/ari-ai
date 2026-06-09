@@ -18,7 +18,10 @@ from app.ml_agri_chat.modules.data_quality import build_data_quality_report, eva
 from app.ml_agri_chat.modules.data_ingestion import DataIngestor, IngestedDocument
 from app.ml_agri_chat.modules.document_chunking import chunk_document
 from app.ml_agri_chat.modules.internet_crawler import InternetCrawler
-from app.ml_agri_chat.modules.intent_classifier import CascadeIntentClassifier
+from app.ml_agri_chat.modules.intent_classifier import (
+    CascadeIntentClassifier,
+    _is_followup_question,
+)
 from app.ml_agri_chat.modules.llm_advisor import ControlledAdvisor
 from app.ml_agri_chat.modules.logger import get_request_logger
 from app.ml_agri_chat.modules.prompt_guard import DISCLAIMER, validate_question
@@ -180,28 +183,25 @@ def _chat_history(history: list[ChatHistoryMessage]) -> list[dict[str, str]]:
 
 
 def _effective_question(question: str, history: list[dict[str, str]]) -> str:
+    """Rewrite the current question so RAG retrieval has the prior context.
+
+    Short follow-ups like "ok chưa", "chiến chưa?", "vậy còn cây kia thì
+    sao" carry no retrievable signal on their own - if we pass them to
+    rag.retrieve() verbatim, the embedding/keyword search picks chunks
+    based on the literal "chiến chưa" tokens and the LLM ends up
+    answering in the wrong topic. The intent classifier already has the
+    canonical follow-up detector; we reuse it here so the two pieces of
+    code cannot drift apart.
+    """
     current = " ".join(question.split())
-    lowered = current.lower()
-    followup_markers = (
-        "ngoài ra",
-        "vậy",
-        "thế",
-        "còn",
-        "cần thêm",
-        "bổ sung",
-        "nữa",
-        "tiếp",
-        "ý đó",
-        "như trên",
-    )
-    is_followup = len(current) < 120 and any(marker in lowered for marker in followup_markers)
-    if not is_followup:
+    if not history or not _is_followup_question(current):
         return current
     previous_user = next((item["content"] for item in reversed(history) if item["role"] == "user"), "")
     previous_assistant = next((item["content"] for item in reversed(history) if item["role"] == "assistant"), "")
     context = previous_user or previous_assistant
     if not context:
         return current
+    lowered = current.lower()
     concrete_terms = (
         "phân",
         "bón",

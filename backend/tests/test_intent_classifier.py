@@ -430,3 +430,44 @@ def test_non_followup_with_history_still_uses_cache():
     r2 = cascade.classify("trồng cà phê khi nào tốt nhất", history=history)
     assert r1.source == "l1_deterministic"
     assert r2.source == "l1_cache"
+
+
+# ---------------- Followup confirmation patterns ----------------
+
+
+def test_followup_confirmation_patterns():
+    """Short replies like 'ok chưa', 'chiến chưa?', 'xong chưa' depend
+    on the prior turn and must be flagged. Reported via screenshot:
+    user asked about pre-harvest care, then sent 'chiến chưa ?' which
+    was being treated as a fresh agri question and retrieved random
+    chunks."""
+    from app.ml_agri_chat.modules.intent_classifier import _is_followup_question
+    for prompt in [
+        "chiến chưa ?",
+        "ok chưa",
+        "ổn chưa",
+        "được chưa",
+        "xong chưa",
+        "đúng không",
+        "phải không",
+        "hiểu chưa",
+        "rồi",
+        "ok",
+        "chưa a",
+    ]:
+        assert _is_followup_question(prompt) is True, prompt
+
+
+def test_followup_does_not_swallow_real_agri_questions():
+    """Long agri questions that happen to end with 'không' or use a
+    deictic pronoun mid-sentence must NOT be flagged - that would
+    bypass the L1 cache and burn LLM tokens for every farming question."""
+    from app.ml_agri_chat.modules.intent_classifier import _is_followup_question
+    for prompt in [
+        "cây cà phê bị bệnh gì",
+        "có nên bón vôi cho cà phê không",
+        "phòng trừ rỉ sắt lá cà phê",
+        "trước thu hoạch cà phê tôi cần lưu ý gì",
+        "trồng cà phê khi nào tốt nhất",
+    ]:
+        assert _is_followup_question(prompt) is False, prompt
