@@ -255,7 +255,9 @@ def chat(request: Request, payload: ChatRequest) -> dict:
         }
 
     with StageTimer("intent") as t_intent:
-        intent_result = intent_classifier.classify(payload.question)
+        intent_result = intent_classifier.classify(
+            payload.question, history=conversation_history
+        )
     log.info(
         "chat_intent label=%s confidence=%.2f source=%s reason=%s elapsed_ms=%.1f",
         intent_result.label,

@@ -309,3 +309,124 @@ def test_stats_starts_empty():
     cascade = CascadeIntentClassifier(_StubLLM(text=""))
     stats = cascade.stats()
     assert stats == {"by_source": {}, "by_label": {}, "total": 0}
+
+
+# ---------------- History-aware follow-up handling ----------------
+
+
+def test_followup_detection_basic():
+    """`_is_followup_question` flags deictic / referential phrasings."""
+    from app.ml_agri_chat.modules.intent_classifier import _is_followup_question
+    assert _is_followup_question("vậy còn cây kia thì sao") is True
+    assert _is_followup_question("thế còn cái này") is True
+    assert _is_followup_question("rồi sao nữa") is True
+    assert _is_followup_question("vậy nó?") is True
+    # Plain agri questions are NOT follow-ups.
+    assert _is_followup_question("cây cà phê bị bệnh gì") is False
+    assert _is_followup_question("trồng cà phê khi nào tốt nhất") is False
+
+
+def test_format_history_renders_role_lines():
+    from app.ml_agri_chat.modules.intent_classifier import _format_history
+    rendered = _format_history(
+        [
+            {"role": "user", "content": "cây cà phê bị bệnh gì"},
+            {"role": "assistant", "content": "Có thể là rỉ sắt..."},
+            {"role": "user", "content": "vậy thì làm sao chữa"},
+        ]
+    )
+    assert "Người dùng" in rendered
+    assert "Trợ lý" in rendered
+    assert "rỉ sắt" in rendered
+
+
+def test_format_history_empty_returns_placeholder():
+    from app.ml_agri_chat.modules.intent_classifier import _format_history
+    assert "không có lịch sử" in _format_history(None)
+    assert "không có lịch sử" in _format_history([])
+
+
+def test_followup_bypasses_l1_cache_and_calls_l2_with_history():
+    """A short follow-up text 'vậy nó' should NOT be answered from cache
+    even if a previous call cached an unrelated intent for the same text."""
+    captured = {"history": None, "calls": 0}
+
+    class HistoryCapturingLLM(_StubLLM):
+        def generate(self, prompt, *, temperature=0.1, timeout_override=None, response_format=None):
+            captured["calls"] += 1
+            captured["history"] = "Người dùng: cây cà phê bị bệnh gì" in prompt
+            return super().generate(
+                prompt,
+                temperature=temperature,
+                timeout_override=timeout_override,
+                response_format=response_format,
+            )
+
+    llm = HistoryCapturingLLM(
+        text='{"intent": "agri_question", "confidence": 0.9, "reason": "câu hỏi nối tiếp về bệnh cây"}'
+    )
+    cascade = CascadeIntentClassifier(llm, l1_confidence_threshold=0.7)
+
+    history = [
+        {"role": "user", "content": "cây cà phê bị bệnh gì"},
+        {"role": "assistant", "content": "Có thể là rỉ sắt"},
+    ]
+    result = cascade.classify("vậy nó", history=history)
+    assert result.source == "l2_llm"
+    assert result.label == "agri_question"
+    assert captured["history"] is True  # LLM saw the prior turn
+    assert captured["calls"] == 1
+
+
+def test_followup_results_are_not_cached():
+    """Two distinct sessions could send 'vậy nó' meaning different things;
+    we must not lock in the first answer."""
+    call_count = {"n": 0}
+
+    class CountingLLM(_StubLLM):
+        def generate(self, prompt, *, temperature=0.1, timeout_override=None, response_format=None):
+            call_count["n"] += 1
+            return super().generate(
+                prompt,
+                temperature=temperature,
+                timeout_override=timeout_override,
+                response_format=response_format,
+            )
+
+    llm = CountingLLM(text='{"intent": "agri_question", "confidence": 0.9}')
+    cascade = CascadeIntentClassifier(llm, l1_confidence_threshold=0.7)
+    history = [{"role": "user", "content": "cây cà phê bị bệnh gì"}]
+
+    cascade.classify("vậy nó", history=history)
+    cascade.classify("vậy nó", history=history)
+    # No cache hit -> LLM called twice.
+    assert call_count["n"] == 2
+
+
+def test_followup_with_no_history_falls_through_l1_normal_path():
+    """A first-turn message that LOOKS like a follow-up but has no history
+    must still go through the normal L1 flow (and cache when L1 is
+    confident). Otherwise the cache becomes useless."""
+    cascade = CascadeIntentClassifier(
+        _StubLLM(text='{"intent": "agri_question", "confidence": 0.9}'),
+        l1_confidence_threshold=0.7,
+    )
+    # Follow-up phrasing but NO history.
+    result1 = cascade.classify("vậy thì sao", history=None)
+    # Then again - should be cache hit.
+    result2 = cascade.classify("vậy thì sao", history=None)
+    assert result2.source in {"l1_cache", "l2_cache"}
+
+
+def test_non_followup_with_history_still_uses_cache():
+    """History attached but the message itself is a fresh agri question -
+    cache must still work to keep latency low for repeat questions."""
+    cascade = CascadeIntentClassifier(
+        _StubLLM(text='{"intent": "agri_question", "confidence": 0.9}'),
+        l1_confidence_threshold=0.7,
+    )
+    history = [{"role": "user", "content": "earlier turn"}]
+    r1 = cascade.classify("trồng cà phê khi nào tốt nhất", history=history)
+    r2 = cascade.classify("trồng cà phê khi nào tốt nhất", history=history)
+    assert r1.source == "l1_deterministic"
+    assert r2.source == "l1_cache"

@@ -187,6 +187,12 @@ class _DeterministicClassifier:
       keyword, crop + agri verb without social verb).
     - 0.6 when only weak signals (crop noun alone, no verb context).
     - 0.0 when nothing matched ("unknown" -> caller falls back to LLM).
+
+    The deterministic layer does not interpret conversation history itself
+    (pattern-matching on "vậy còn..." without semantic context risks more
+    false positives than it fixes). Instead it surfaces a `followup`
+    confidence-zero result so the cascade knows to consult L2 with the
+    history attached.
     """
 
     def classify(self, question: str) -> IntentResult:
@@ -295,6 +301,10 @@ Quy tắc:
 - Nếu câu vừa rủ vừa hỏi kỹ thuật, ưu tiên agri_question.
 - "đi cà phê", "uống cà phê", "làm ly cà phê" KHÔNG phải agri_question - đó là social_chitchat.
 - "trồng cà phê", "cây cà phê bị bệnh", "bón phân cho cà phê" - là agri_question.
+- Nếu câu hiện tại là câu hỏi nối tiếp ngữ cảnh (vd "vậy còn cây kia thì sao", "rồi sao nữa", "thế còn cái này", "loại đó thế nào"), HÃY phân loại theo intent của lịch sử hội thoại gần nhất, không tự suy ra ngoài context.
+
+LỊCH SỬ HỘI THOẠI (gần nhất):
+{history}
 
 CÂU CẦN PHÂN LOẠI:
 {question}
@@ -302,7 +312,52 @@ CÂU CẦN PHÂN LOẠI:
 JSON:"""
 
 
+_FOLLOWUP_MARKERS = {
+    # Stripped form. Token-aware match to avoid false positives.
+    "vay con", "vay thi", "the con", "the nao", "ra sao",
+    "roi sao", "roi thi sao", "con cai do", "con loai do",
+    "loai do", "cai do", "no thi sao", "vay no",
+    "tiep theo", "ke tiep", "tiep tuc",
+}
+
+
 _JSON_OBJECT_RE = re.compile(r"\{.*?\}", re.DOTALL)
+
+
+def _format_history(history: list[dict[str, str]] | None) -> str:
+    """Render at most the last 4 turns as `Role: text` lines for the LLM
+    prompt. Truncates each message to keep token cost predictable. Returns
+    a placeholder when there is no usable history so the prompt template
+    still substitutes cleanly."""
+    if not history:
+        return "(không có lịch sử)"
+    lines: list[str] = []
+    for item in history[-4:]:
+        role = item.get("role", "user")
+        content = re.sub(r"\s+", " ", str(item.get("content", ""))).strip()
+        if not content:
+            continue
+        prefix = "Người dùng" if role == "user" else "Trợ lý"
+        lines.append(f"{prefix}: {content[:200]}")
+    return "\n".join(lines) if lines else "(không có lịch sử)"
+
+
+def _is_followup_question(question: str) -> bool:
+    """Heuristic for follow-up questions that depend on previous context.
+
+    Used by the cascade to escalate to L2 even when L1 would otherwise
+    return high-confidence rejection (e.g. a follow-up that happens to
+    contain an OOS keyword). Token-aware to keep false positives down.
+    """
+    compact = _compact(_normalize(question))
+    if any(marker in compact for marker in _FOLLOWUP_MARKERS):
+        return True
+    # Very short messages with a deictic pronoun ("vậy nó?", "thế?")
+    # almost always reference the prior turn.
+    words = compact.split()
+    if len(words) <= 3 and any(token in {"vay", "the", "no", "do"} for token in words):
+        return True
+    return False
 
 
 class _LLMIntentClassifier:
@@ -312,7 +367,11 @@ class _LLMIntentClassifier:
         self._llm = llm_client
         self._timeout = timeout_seconds
 
-    def classify(self, question: str) -> IntentResult:
+    def classify(
+        self,
+        question: str,
+        history: list[dict[str, str]] | None = None,
+    ) -> IntentResult:
         if not self._llm.is_enabled():
             return IntentResult(
                 "agri_question",
@@ -321,7 +380,10 @@ class _LLMIntentClassifier:
                 "llm_disabled",
             )
 
-        prompt = _LLM_PROMPT_TEMPLATE.format(question=question[:500])
+        prompt = _LLM_PROMPT_TEMPLATE.format(
+            question=question[:500],
+            history=_format_history(history),
+        )
         result = self._llm.generate(
             prompt,
             temperature=0.0,
@@ -449,7 +511,11 @@ class CascadeIntentClassifier:
         self._source_counts: Counter[str] = Counter()
         self._label_counts: Counter[str] = Counter()
 
-    def classify(self, question: str) -> IntentResult:
+    def classify(
+        self,
+        question: str,
+        history: list[dict[str, str]] | None = None,
+    ) -> IntentResult:
         cache_key = _compact(_normalize(question))
         if not cache_key:
             result = IntentResult(
@@ -458,30 +524,40 @@ class CascadeIntentClassifier:
             self._record(result)
             return result
 
-        cached = self._cache.get(cache_key)
-        if cached is not None:
-            # Preserve source info but mark as cache hit so logs are obvious.
-            cached_result = IntentResult(
-                cached.label,
-                cached.confidence,
-                cached.source.replace("l2_llm", "l2_cache").replace(
-                    "l1_deterministic", "l1_cache"
-                ),
-                cached.reason,
-            )
-            self._record(cached_result)
-            return cached_result
+        # Follow-up questions bypass the L1->cache shortcut because their
+        # meaning depends on the conversation history. We still consult L1
+        # so a clearly social ("đi cà phê nha") or OOS follow-up is not
+        # forced to the LLM, but we never cache them - the same surface
+        # text can mean different things across sessions.
+        is_followup = bool(history) and _is_followup_question(question)
+
+        if not is_followup:
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                # Preserve source info but mark as cache hit so logs are obvious.
+                cached_result = IntentResult(
+                    cached.label,
+                    cached.confidence,
+                    cached.source.replace("l2_llm", "l2_cache").replace(
+                        "l1_deterministic", "l1_cache"
+                    ),
+                    cached.reason,
+                )
+                self._record(cached_result)
+                return cached_result
 
         result = self._l1.classify(question)
-        if result.confidence >= self._threshold:
+        if not is_followup and result.confidence >= self._threshold:
             self._cache.put(cache_key, result)
             self._record(result)
             return result
 
-        # Ambiguous or unknown - escalate.
-        l2_result = self._l2.classify(question)
-        if l2_result.source == "l2_llm":
-            # Only cache trusted L2 outcomes.
+        # Ambiguous, unknown, or follow-up - escalate to L2 with history.
+        l2_result = self._l2.classify(question, history=history)
+        # Don't cache follow-ups; same text can resolve differently across
+        # sessions. Don't cache fallback either (would lock in a transient
+        # LLM failure).
+        if not is_followup and l2_result.source == "l2_llm":
             self._cache.put(cache_key, l2_result)
         self._record(l2_result)
         return l2_result
