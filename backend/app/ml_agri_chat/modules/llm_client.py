@@ -65,7 +65,7 @@ class _Provider(ABC):
     model: str
 
     @abstractmethod
-    def generate(self, prompt: str, *, temperature: float) -> LLMResult: ...
+    def generate(self, prompt: str, *, temperature: float, timeout_override: float | None = None) -> LLMResult: ...
 
     @abstractmethod
     def status(self) -> dict[str, Any]: ...
@@ -90,7 +90,7 @@ class _DisabledProvider(_Provider):
     def is_configured(self) -> bool:
         return False
 
-    def generate(self, prompt: str, *, temperature: float) -> LLMResult:
+    def generate(self, prompt: str, *, temperature: float, timeout_override: float | None = None) -> LLMResult:
         return LLMResult(
             text="",
             provider=self.name,
@@ -119,7 +119,7 @@ class _OllamaProvider(_Provider):
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
 
-    def generate(self, prompt: str, *, temperature: float) -> LLMResult:
+    def generate(self, prompt: str, *, temperature: float, timeout_override: float | None = None) -> LLMResult:
         try:
             response = requests.post(
                 f"{self.base_url}/api/generate",
@@ -132,7 +132,7 @@ class _OllamaProvider(_Provider):
                         "num_predict": 700,
                     },
                 },
-                timeout=self.timeout_seconds,
+                timeout=timeout_override if timeout_override is not None else self.timeout_seconds,
             )
             response.raise_for_status()
             payload: dict[str, Any] = response.json()
@@ -194,7 +194,7 @@ class _DeepSeekProvider(_Provider):
             "Content-Type": "application/json",
         }
 
-    def generate(self, prompt: str, *, temperature: float) -> LLMResult:
+    def generate(self, prompt: str, *, temperature: float, timeout_override: float | None = None) -> LLMResult:
         if not self._api_key:
             return LLMResult(
                 text="",
@@ -214,7 +214,7 @@ class _DeepSeekProvider(_Provider):
                     "max_tokens": 700,
                     "stream": False,
                 },
-                timeout=self.timeout_seconds,
+                timeout=timeout_override if timeout_override is not None else self.timeout_seconds,
             )
             response.raise_for_status()
             payload: dict[str, Any] = response.json()
@@ -387,8 +387,10 @@ class LocalLLMClient:
     def is_enabled(self) -> bool:
         return self.enabled
 
-    def generate(self, prompt: str, *, temperature: float = 0.1) -> LLMResult:
-        result = self._primary.generate(prompt, temperature=temperature)
+    def generate(self, prompt: str, *, temperature: float = 0.1, timeout_override: float | None = None) -> LLMResult:
+        result = self._primary.generate(
+            prompt, temperature=temperature, timeout_override=timeout_override
+        )
         if not result.used_fallback or self._fallback is None:
             self.last_call_provider = result.provider
             self.last_call_model = result.model
@@ -396,7 +398,9 @@ class LocalLLMClient:
 
         # Primary failed at runtime. Try fallback.
         primary_error = result.error or "unknown error"
-        fallback_result = self._fallback.generate(prompt, temperature=temperature)
+        fallback_result = self._fallback.generate(
+            prompt, temperature=temperature, timeout_override=timeout_override
+        )
         if fallback_result.used_fallback:
             # Both failed. Report aggregated error; keep primary-shaped
             # provider/model so logs still show the intended chain.

@@ -153,30 +153,6 @@ CAPABILITY_PATTERNS = [
     "nong tri ai la gi",
 ]
 
-# Cụm xã giao có nhắc đến tên cây trồng nhưng KHÔNG phải câu hỏi
-# nông nghiệp (rủ đi uống, hẹn hò, ăn uống). Cần catch trước retrieval +
-# LLM để khỏi tốn token và trả về nội dung lạc đề.
-# Đã normalize: bỏ dấu, lowercase, `đ`->`d`.
-SOCIAL_INVITATION_PATTERNS = [
-    "di ca phe",
-    "di cafe",
-    "di cf",
-    "uong ca phe",
-    "uong cafe",
-    "ly ca phe",
-    "ly cafe",
-    "coc ca phe",
-    "tach ca phe",
-    "lam ly ca phe",
-    "lam coc ca phe",
-    "ru di ca phe",
-    "hen ho",
-    "di an",
-    "di choi",
-    "di nhau",
-    "lam vai ly",
-]
-
 
 def validate_question(question: str) -> tuple[bool, str | None]:
     normalized = _normalize_text(question)
@@ -234,16 +210,6 @@ def basic_chat_response(question: str) -> dict[str, str] | None:
                 "thu hoạch, quản trị sản xuất hoặc nhóm khác liên quan. Với lời chào/câu hỏi ngoài phạm vi, mình dùng lớp "
                 "giao tiếp để phản hồi mềm và hướng bạn quay lại đúng phạm vi. Nếu nhóm đó chưa có tài liệu phù hợp, "
                 "mình sẽ nói chưa đủ dữ liệu."
-            ),
-            "confidence_level": "cao",
-        }
-    # "tối đi cà phê không?" / "ly cà phê nhé" — câu xã giao nhắc tới
-    # crop nhưng không phải hỏi kỹ thuật. Trả lời mềm, không gọi RAG/LLM.
-    if any(pattern in compact for pattern in SOCIAL_INVITATION_PATTERNS):
-        return {
-            "answer": (
-                "Cảm ơn lời mời, nhưng mình là trợ lý chỉ làm việc về nông nghiệp cây cà phê thôi. "
-                "Bạn có câu hỏi nào về vườn cà phê, sâu bệnh, chăm sóc hay thu hoạch không?"
             ),
             "confidence_level": "cao",
         }

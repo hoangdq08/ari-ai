@@ -18,9 +18,10 @@ from app.ml_agri_chat.modules.data_quality import build_data_quality_report, eva
 from app.ml_agri_chat.modules.data_ingestion import DataIngestor, IngestedDocument
 from app.ml_agri_chat.modules.document_chunking import chunk_document
 from app.ml_agri_chat.modules.internet_crawler import InternetCrawler
+from app.ml_agri_chat.modules.intent_classifier import CascadeIntentClassifier
 from app.ml_agri_chat.modules.llm_advisor import ControlledAdvisor
 from app.ml_agri_chat.modules.logger import get_request_logger
-from app.ml_agri_chat.modules.prompt_guard import DISCLAIMER, basic_chat_response, validate_question
+from app.ml_agri_chat.modules.prompt_guard import DISCLAIMER, validate_question
 from app.ml_agri_chat.modules.rag import AgriculturalRAG
 from app.ml_agri_chat.modules.search_discovery import SearchDiscovery
 from app.ml_agri_chat.modules.source_policy import source_review_decision, source_warnings
@@ -59,6 +60,7 @@ crawler = InternetCrawler(ingestor, CRAWL_CANDIDATE_DIR)
 search_discovery = SearchDiscovery(CRAWL_CANDIDATE_DIR)
 rag = AgriculturalRAG(VECTOR_DIR)
 advisor = ControlledAdvisor()
+intent_classifier = CascadeIntentClassifier(advisor.llm_client)
 classifier = CoffeeVisionClassifier(ML_PIPELINE_DIR / "models" / "coffee_disease_model.keras")
 CRAWL_EVENTS: list[dict] = []
 ACTIVITY_EVENTS: list[dict] = []
@@ -250,21 +252,28 @@ def chat(request: Request, payload: ChatRequest) -> dict:
             "safety_disclaimer": DISCLAIMER,
         }
 
-    basic_response = basic_chat_response(payload.question)
-    if basic_response:
-        log.info("chat_basic_intent confidence=%s", basic_response["confidence_level"])
+    intent_result = intent_classifier.classify(payload.question)
+    log.info(
+        "chat_intent label=%s confidence=%.2f source=%s reason=%s",
+        intent_result.label,
+        intent_result.confidence,
+        intent_result.source,
+        intent_result.reason,
+    )
+    canned = CascadeIntentClassifier.canned_response(intent_result.label)
+    if canned is not None:
         _log_activity(
             request_id,
             "chat",
-            "basic_intent",
-            "Answered with basic communication intent",
-            {"confidence_level": basic_response["confidence_level"]},
+            "intent_short_circuit",
+            "Answered from intent classifier without calling RAG/LLM",
+            {
+                "intent": intent_result.label,
+                "confidence": round(intent_result.confidence, 2),
+                "source": intent_result.source,
+            },
         )
-        return {
-            **basic_response,
-            "sources": [],
-            "safety_disclaimer": DISCLAIMER,
-        }
+        return {**canned, "intent": intent_result.label, "session_id": payload.session_id}
 
     route = classify_query(effective_question)
     if is_vague_disease_question(effective_question):
