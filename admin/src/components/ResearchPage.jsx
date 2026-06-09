@@ -223,9 +223,20 @@ function PipelineTimeline({ running, completed, sourceCount, events = [] }) {
       // like a silent failure even though everything worked - the source
       // was just already on disk.
       if (name === "duplicate" || name === "duplicate_skipped") acc.duplicate.add(key);
+      // `skipped` is set by the HEAD preflight when content-length is too
+      // big or content-type is unparseable. We treat it as processed so
+      // progress can still hit 100%.
+      if (name === "skipped") acc.skipped.add(key);
       return acc;
     },
-    { fetching: new Set(), ingested: new Set(), failed: new Set(), chunked: new Set(), duplicate: new Set() }
+    {
+      fetching: new Set(),
+      ingested: new Set(),
+      failed: new Set(),
+      chunked: new Set(),
+      duplicate: new Set(),
+      skipped: new Set(),
+    }
   );
   const count = {
     fetching: eventCounts.fetching.size,
@@ -233,11 +244,16 @@ function PipelineTimeline({ running, completed, sourceCount, events = [] }) {
     failed: eventCounts.failed.size,
     chunked: eventCounts.chunked.size,
     duplicate: eventCounts.duplicate.size,
+    skipped: eventCounts.skipped.size,
   };
-  // Duplicates count as "processed" - they were attempted, found existing,
-  // and skipped on purpose. Otherwise progress stays at 0% when the user
-  // re-runs the same URL set.
-  const processedCount = Math.min(sourceCount, count.ingested + count.failed + count.duplicate);
+  // Duplicates and skipped count as "processed" - they were attempted, the
+  // pipeline decided not to write anything for valid reasons (already on
+  // disk / oversized / wrong content-type). Otherwise progress stays at
+  // 0% even though work actually finished.
+  const processedCount = Math.min(
+    sourceCount,
+    count.ingested + count.failed + count.duplicate + count.skipped
+  );
   const progressPercent = sourceCount ? Math.min(100, Math.round((processedCount / sourceCount) * 100)) : 0;
   const latestEvent = events[events.length - 1];
   const stageLabel = completed
@@ -252,7 +268,9 @@ function PipelineTimeline({ running, completed, sourceCount, events = [] }) {
             ? "Ghi nhận nguồn lỗi"
             : latestEvent?.event === "duplicate" || latestEvent?.event === "duplicate_skipped"
               ? "Nguồn đã tồn tại, bỏ qua"
-              : "Chờ sự kiện crawl";
+              : latestEvent?.event === "skipped"
+                ? "Bỏ qua nguồn không phù hợp"
+                : "Chờ sự kiện crawl";
 
   return (
     <section className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -278,7 +296,7 @@ function PipelineTimeline({ running, completed, sourceCount, events = [] }) {
             />
           </div>
           <p className="mt-2 text-xs font-semibold text-slate-500">
-            Đã thử tải {count.fetching} · Đã nạp {count.ingested} · Đã chunk {count.chunked} · Đã có sẵn {count.duplicate} · Lỗi {count.failed}
+            Đã thử tải {count.fetching} · Đã nạp {count.ingested} · Đã chunk {count.chunked} · Đã có sẵn {count.duplicate} · Bỏ qua {count.skipped} · Lỗi {count.failed}
           </p>
         </div>
       </div>
@@ -298,6 +316,10 @@ export default function ResearchPage({ apiBase, admin = false }) {
   const [crawlResult, setCrawlResult] = useState(null);
   const [maxResults, setMaxResults] = useState(50);
   const [collectLinks, setCollectLinks] = useState(false);
+  // Defaults off so the historical "duplicates are skipped" UX is the
+  // safe path. When the user explicitly opts in, the backend overwrites
+  // the existing raw file and leaves a `.json.bak` behind for rollback.
+  const [forceCrawl, setForceCrawl] = useState(false);
   const [expandedTexts, setExpandedTexts] = useState([]);
   const [crawlEvents, setCrawlEvents] = useState([]);
   const [crawlStartedAt, setCrawlStartedAt] = useState(null);
@@ -467,7 +489,8 @@ export default function ResearchPage({ apiBase, admin = false }) {
           reliability_level: "internet",
           max_pages: selectedUrls.length,
           collect_links: collectLinks,
-          same_domain_only: true
+          same_domain_only: true,
+          force: forceCrawl
         })
       });
       if (!response.ok) throw new Error(await response.text());
@@ -838,15 +861,29 @@ export default function ResearchPage({ apiBase, admin = false }) {
                 : `${availableUrlCount} nguồn khả dụng`}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={crawlSelected}
-              disabled={!selectedUrls.length || crawling}
-              className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300"
-            >
-              {crawling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
-              Nạp dữ liệu
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <label
+                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold ${forceCrawl ? "border-amber-300 bg-amber-50 text-amber-800" : "border-slate-200 bg-white text-slate-600"}`}
+                title="Nếu nguồn đã có trên hệ thống, sẽ ghi đè bản mới và tạo file .bak để rollback."
+              >
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5"
+                  checked={forceCrawl}
+                  onChange={(event) => setForceCrawl(event.target.checked)}
+                />
+                Buộc cập nhật lại nguồn đã có
+              </label>
+              <button
+                type="button"
+                onClick={crawlSelected}
+                disabled={!selectedUrls.length || crawling}
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300"
+              >
+                {crawling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
+                Nạp dữ liệu
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -866,6 +903,9 @@ export default function ResearchPage({ apiBase, admin = false }) {
             <CheckCircle2 className="h-5 w-5 text-emerald-600" />
             <h2 className="text-lg font-bold text-slate-900">Kết quả nạp dữ liệu</h2>
           </div>
+          <p className="mt-1 text-xs font-semibold text-slate-500">
+            Mới nạp {(crawlResult.ingested || []).length} · Đã có sẵn {(crawlResult.duplicates || []).length} · Bỏ qua {(crawlResult.skipped || []).length}
+          </p>
           <div className="mt-4 space-y-3">
             {crawlResult.ingested.map((item) => (
               <article key={item.source_id} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
@@ -887,6 +927,35 @@ export default function ResearchPage({ apiBase, admin = false }) {
                 </button>
               </article>
             ))}
+            {(crawlResult.duplicates || []).length > 0 && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-600">Nguồn đã tồn tại, bỏ qua</p>
+                <ul className="mt-2 space-y-1.5">
+                  {crawlResult.duplicates.map((item) => (
+                    <li key={item.source_id} className="text-xs text-slate-700">
+                      <span className="font-semibold text-slate-900">{item.title || item.url}</span>
+                      <span className="ml-2 text-slate-500">
+                        · {item.chunks_count || 0} chunk
+                        {item.existed_since ? ` · từ ${new Date(item.existed_since).toLocaleDateString("vi-VN")}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {(crawlResult.skipped || []).length > 0 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-800">Bỏ qua khi tải</p>
+                <ul className="mt-2 space-y-1.5">
+                  {crawlResult.skipped.map((item) => (
+                    <li key={item.url} className="text-xs text-amber-900">
+                      <span className="font-semibold">{item.url}</span>
+                      <span className="ml-2 text-amber-700">· {item.reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </section>
       )}

@@ -120,6 +120,12 @@ class CrawlUrlsRequest(BaseModel):
     max_pages: int = Field(default=10, ge=1)
     collect_links: bool = False
     same_domain_only: bool = True
+    # When `True`, the crawler bypasses duplicate detection on already-stored
+    # raw documents and overwrites them with the freshly fetched content.
+    # The previous raw file is backed up to <source_id>.json.bak so a bad
+    # refresh can be rolled back. Defaults to False so the historical
+    # "skip if already crawled" UX is the safe default.
+    force: bool = False
 
 
 class ResearchSearchRequest(BaseModel):
@@ -413,11 +419,25 @@ def crawl_urls(payload: CrawlUrlsRequest) -> dict:
         collect_links=payload.collect_links,
         same_domain_only=payload.same_domain_only,
         progress_callback=lambda event: _log_crawl_event(request_id, event),
+        force=payload.force,
     )
 
     ingested = []
+    duplicates: list[dict] = []
+    skipped: list[dict] = []
     for item in results:
         if item.status == "duplicate" and item.source_id:
+            existing_metadata = (_read_json_file(RAW_DIR / f"{item.source_id}.json", default={}) or {}).get("metadata") or {}
+            duplicates.append(
+                {
+                    "source_id": item.source_id,
+                    "url": item.url,
+                    "title": item.title or existing_metadata.get("title"),
+                    "source_type": item.source_type or existing_metadata.get("source_type"),
+                    "existed_since": existing_metadata.get("crawled_at"),
+                    "chunks_count": _existing_chunk_count(item.source_id),
+                }
+            )
             _log_crawl_event(
                 request_id,
                 {
@@ -434,6 +454,15 @@ def crawl_urls(payload: CrawlUrlsRequest) -> dict:
                 "duplicate_skipped",
                 "Crawled source already exists; skipped chunk/vector write",
                 {"source_id": item.source_id, "url": item.url},
+            )
+            continue
+        if item.status == "skipped":
+            skipped.append(
+                {
+                    "url": item.url,
+                    "reason": item.error,
+                    "content_type": item.content_type,
+                }
             )
             continue
         if item.status != "ingested" or not item.source_id:
@@ -479,10 +508,13 @@ def crawl_urls(payload: CrawlUrlsRequest) -> dict:
         )
 
     log.info(
-        "crawl_urls urls=%s ingested=%s failed=%s",
+        "crawl_urls urls=%s ingested=%s duplicate=%s skipped=%s failed=%s force=%s",
         len(payload.urls),
         sum(1 for item in results if item.status == "ingested"),
+        sum(1 for item in results if item.status == "duplicate"),
+        sum(1 for item in results if item.status == "skipped"),
         sum(1 for item in results if item.status == "failed"),
+        payload.force,
     )
     _log_activity(
         request_id,
@@ -492,13 +524,18 @@ def crawl_urls(payload: CrawlUrlsRequest) -> dict:
         {
             "url_count": len(payload.urls),
             "ingested": sum(1 for item in results if item.status == "ingested"),
+            "duplicate": sum(1 for item in results if item.status == "duplicate"),
+            "skipped": sum(1 for item in results if item.status == "skipped"),
             "failed": sum(1 for item in results if item.status == "failed"),
+            "force": payload.force,
         },
     )
     return {
         "request_id": request_id,
         "results": [item.to_dict() for item in results],
         "ingested": ingested,
+        "duplicates": duplicates,
+        "skipped": skipped,
     }
 
 

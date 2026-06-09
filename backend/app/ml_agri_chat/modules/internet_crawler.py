@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import time
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,6 +14,30 @@ from bs4 import BeautifulSoup
 
 from .data_ingestion import DataIngestor, IngestedDocument
 from .source_policy import infer_reliability
+
+
+# Maximum content-length (bytes) the crawler will attempt to fetch. Anything
+# larger triggers a `skipped` status without touching disk so we do not
+# accidentally pull a 500MB binary into the chunker. Override per-deploy
+# via env when needed (e.g. ingesting big PDFs).
+_DEFAULT_MAX_FETCH_BYTES = 10 * 1024 * 1024  # 10 MiB
+# Retry knobs for transient fetch failures. Mirrors the LLM client retry
+# strategy (llm_client._DEEPSEEK_MAX_RETRIES) so behaviour is predictable
+# across services. Backoff stays short because the user is waiting.
+_FETCH_MAX_RETRIES = 2
+_FETCH_BACKOFF_BASE_SECONDS = 0.5
+_FETCH_RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
+_HEAD_TIMEOUT_SECONDS = 5
+_GET_TIMEOUT_SECONDS = 20
+# Content types we know how to parse downstream.
+_ALLOWED_CONTENT_TYPE_TOKENS = (
+    "text/html",
+    "application/xhtml",
+    "text/plain",
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml",
+)
 
 
 BLOCKED_HOST_TOKENS = {
@@ -133,6 +159,7 @@ class InternetCrawler:
         collect_links: bool = False,
         same_domain_only: bool = True,
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
+        force: bool = False,
     ) -> list[CrawlItem]:
         queue = list(dict.fromkeys(urls))[:max_pages]
         seen: set[str] = set()
@@ -146,7 +173,9 @@ class InternetCrawler:
             seen.add(url)
             if progress_callback:
                 progress_callback({"event": "fetching", "url": url, "seen": len(seen), "max_pages": max_pages})
-            item = self._crawl_one(url, reliability_level, collect_links=collect_links)
+            item = self._crawl_one(
+                url, reliability_level, collect_links=collect_links, force=force
+            )
             results.append(item)
             self._append_jsonl(self.history_path, item.to_dict())
             if progress_callback:
@@ -181,14 +210,34 @@ class InternetCrawler:
     def recent_links(self, limit: int = 50) -> list[dict[str, Any]]:
         return self._read_jsonl_tail(self.links_path, limit)
 
-    def _crawl_one(self, url: str, reliability_level: str, collect_links: bool) -> CrawlItem:
+    def _crawl_one(
+        self,
+        url: str,
+        reliability_level: str,
+        collect_links: bool,
+        force: bool = False,
+    ) -> CrawlItem:
         effective_reliability = infer_reliability(url, reliability_level)
+        # HEAD preflight: skip oversized or unparseable resources before we
+        # spend bandwidth on a full GET. Servers that refuse HEAD (405) or
+        # do not advertise content-length / content-type fall through to
+        # the GET path so we do not lose legitimate sources.
+        skip_reason = self._preflight(url)
+        if skip_reason is not None:
+            return CrawlItem(
+                url=url,
+                status="skipped",
+                reliability_level=effective_reliability,
+                error=skip_reason,
+                discovered_links=[],
+            )
         try:
-            response = requests.get(url, timeout=20, headers={"User-Agent": "NongTriAI/0.1 internet crawler"})
-            response.raise_for_status()
+            response = self._fetch_with_retries(url)
             content_type = response.headers.get("content-type", "")
             title, links = self._extract_title_and_links(url, response.text, content_type, collect_links)
-            ingested: IngestedDocument = self.ingestor.ingest_url(url, title, effective_reliability)
+            ingested: IngestedDocument = self.ingestor.ingest_url(
+                url, title, effective_reliability, force_refresh=force
+            )
             status = "duplicate" if ingested.is_duplicate else "ingested"
             return CrawlItem(
                 url=url,
@@ -203,6 +252,76 @@ class InternetCrawler:
         except Exception as exc:
             item = CrawlItem(url=url, status="failed", reliability_level=effective_reliability, error=str(exc), discovered_links=[])
             return item
+
+    def _preflight(self, url: str) -> str | None:
+        """Return a skip reason if HEAD says the resource is too big or of
+        an unsupported type. None means "looks fine, proceed to GET".
+        Servers that reject HEAD or omit headers always pass."""
+        max_bytes = int(
+            os.getenv("NONGTRI_CRAWL_MAX_BYTES", str(_DEFAULT_MAX_FETCH_BYTES))
+        )
+        try:
+            response = requests.head(
+                url,
+                timeout=_HEAD_TIMEOUT_SECONDS,
+                allow_redirects=True,
+                headers={"User-Agent": "NongTriAI/0.1 internet crawler"},
+            )
+        except Exception:
+            return None  # Don't block on flaky HEAD - try the real GET.
+        if response.status_code >= 400:
+            # Some servers 405 on HEAD; let GET try.
+            return None
+        content_type = (response.headers.get("content-type") or "").lower()
+        if content_type and not any(
+            token in content_type for token in _ALLOWED_CONTENT_TYPE_TOKENS
+        ):
+            return f"unsupported content-type {content_type!r}"
+        raw_length = response.headers.get("content-length")
+        if raw_length:
+            try:
+                length = int(raw_length)
+            except ValueError:
+                length = 0
+            if length > max_bytes:
+                return f"content-length {length} exceeds limit {max_bytes}"
+        return None
+
+    def _fetch_with_retries(self, url: str) -> requests.Response:
+        """GET with bounded exponential backoff on transient failures.
+
+        Mirrors the LLM client retry shape (timeout / 5xx / 429) and stays
+        small because the user is blocked on the response. 4xx errors and
+        connection refused that survive the retries propagate to the
+        caller which records `status='failed'`.
+        """
+        last_error: Exception | None = None
+        for attempt in range(_FETCH_MAX_RETRIES + 1):
+            try:
+                response = requests.get(
+                    url,
+                    timeout=_GET_TIMEOUT_SECONDS,
+                    headers={"User-Agent": "NongTriAI/0.1 internet crawler"},
+                )
+                if response.status_code in _FETCH_RETRY_STATUS_CODES and attempt < _FETCH_MAX_RETRIES:
+                    time.sleep(_FETCH_BACKOFF_BASE_SECONDS * (2 ** attempt))
+                    continue
+                response.raise_for_status()
+                return response
+            except (requests.Timeout, requests.ConnectionError) as exc:
+                last_error = exc
+                if attempt < _FETCH_MAX_RETRIES:
+                    time.sleep(_FETCH_BACKOFF_BASE_SECONDS * (2 ** attempt))
+                    continue
+                raise
+            except requests.HTTPError:
+                # 4xx that we did not whitelist for retry. Surface to caller.
+                raise
+        # All retries exhausted on a retryable status - re-raise the last
+        # transient error if any, otherwise raise a generic HTTP error.
+        if last_error is not None:
+            raise last_error
+        raise requests.HTTPError(f"retries exhausted for {url}")
 
     def _extract_title_and_links(self, url: str, text: str, content_type: str, collect_links: bool) -> tuple[str | None, list[str]]:
         if "html" not in content_type.lower():

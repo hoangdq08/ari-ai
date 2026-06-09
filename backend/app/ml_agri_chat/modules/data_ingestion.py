@@ -78,7 +78,14 @@ class DataIngestor:
         self._save_raw(source_id, raw_text, metadata)
         return IngestedDocument(source_id=source_id, raw_text=raw_text, metadata=metadata)
 
-    def ingest_url(self, url: str, title: str | None, reliability_level: str) -> IngestedDocument:
+    def ingest_url(
+        self,
+        url: str,
+        title: str | None,
+        reliability_level: str,
+        *,
+        force_refresh: bool = False,
+    ) -> IngestedDocument:
         response = requests.get(url, timeout=20, headers={"User-Agent": "NongTriAI/0.1"})
         response.raise_for_status()
         parsed = urlparse(url)
@@ -104,6 +111,32 @@ class DataIngestor:
 
         content_hash = _content_hash(raw_text)
         source_id = _source_id(url)
+
+        # Force refresh: skip both duplicate detection paths so the caller
+        # can overwrite a stale crawl. The previous raw file (if any) is
+        # backed up to `<source_id>.json.bak` so we have a one-step
+        # rollback in case the new content turns out to be worse.
+        if force_refresh:
+            existing_path = self.raw_dir / f"{source_id}.json"
+            if existing_path.exists():
+                backup_path = self.raw_dir / f"{source_id}.json.bak"
+                backup_path.write_bytes(existing_path.read_bytes())
+            metadata = self._build_url_metadata(
+                source_id=source_id,
+                url=url,
+                title=title,
+                parsed=parsed,
+                source_type=source_type,
+                file_name=file_name,
+                reliability_level=reliability_level,
+                content_type=content_type,
+                content_hash=content_hash,
+            )
+            self._save_raw(source_id, raw_text, metadata)
+            return IngestedDocument(
+                source_id=source_id, raw_text=raw_text, metadata=metadata
+            )
+
         duplicate = self._find_duplicate(content_hash, allow_source_id=source_id)
         if duplicate:
             duplicate_metadata, duplicate_text = duplicate
@@ -128,7 +161,34 @@ class DataIngestor:
                     duplicate_of=source_id,
                 )
 
-        metadata = {
+        metadata = self._build_url_metadata(
+            source_id=source_id,
+            url=url,
+            title=title,
+            parsed=parsed,
+            source_type=source_type,
+            file_name=file_name,
+            reliability_level=reliability_level,
+            content_type=content_type,
+            content_hash=content_hash,
+        )
+        self._save_raw(source_id, raw_text, metadata)
+        return IngestedDocument(source_id=source_id, raw_text=raw_text, metadata=metadata)
+
+    @staticmethod
+    def _build_url_metadata(
+        *,
+        source_id: str,
+        url: str,
+        title: str | None,
+        parsed,
+        source_type: str,
+        file_name: str | None,
+        reliability_level: str,
+        content_type: str,
+        content_hash: str,
+    ) -> dict[str, Any]:
+        return {
             "source_id": source_id,
             "source_type": source_type,
             "title": title or parsed.netloc,
@@ -141,8 +201,6 @@ class DataIngestor:
             "content_hash": content_hash,
             "dedupe_key": f"url:{url}|sha256:{content_hash}",
         }
-        self._save_raw(source_id, raw_text, metadata)
-        return IngestedDocument(source_id=source_id, raw_text=raw_text, metadata=metadata)
 
     def _save_raw(self, source_id: str, raw_text: str, metadata: dict[str, Any]) -> None:
         with (self.raw_dir / f"{source_id}.json").open("w", encoding="utf-8") as handle:
