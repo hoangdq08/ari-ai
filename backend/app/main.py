@@ -11,6 +11,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
+from app.shared.latency import LatencyMiddleware
 from app.shared.rate_limit import limiter
 
 
@@ -37,6 +38,9 @@ def get_application() -> FastAPI:
     application.state.limiter = limiter
     application.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
     application.add_middleware(SlowAPIMiddleware)
+    # Latency middleware sits in front of SlowAPI so we still time rate-limited
+    # responses (they are real requests too).
+    application.add_middleware(LatencyMiddleware)
 
     # Set all CORS enabled origins
     if settings.BACKEND_CORS_ORIGINS:

@@ -88,6 +88,11 @@ def _is_seed_source(source_id: str, metadata: dict[str, Any]) -> bool:
 def evaluate_retrieval_cases(cases: list[dict[str, Any]], rag: Any, top_k: int = 5) -> dict[str, Any]:
     results = []
     passed = 0
+    # Aggregates for KPI reporting (slide 13).
+    recall_at_k_total = 0.0
+    reciprocal_rank_total = 0.0
+    cite_rate_hits = 0
+    refusal_hits = 0  # tracks cases where retrieval returned nothing => system should refuse
     for case in cases:
         question = case.get("question", "")
         expected_terms = [term.lower() for term in case.get("expected_terms", [])]
@@ -119,6 +124,37 @@ def evaluate_retrieval_cases(cases: list[dict[str, Any]], rag: Any, top_k: int =
         top_pass = not expected_top_terms or len(matched_top_terms) == len(expected_top_terms)
         is_pass = retrieval_pass and top_pass
         passed += int(is_pass)
+
+        # KPI proxies (without gold chunk_ids we approximate against expected_terms).
+        # Recall@k: portion of expected_terms that appear anywhere in retrieved chunks.
+        recall_at_k = len(matched_terms) / len(expected_terms) if expected_terms else (1.0 if chunks else 0.0)
+        recall_at_k_total += recall_at_k
+
+        # MRR: rank of the first chunk that mentions ALL expected_top_terms.
+        rr = 0.0
+        if expected_top_terms and chunks:
+            for index, chunk in enumerate(chunks, start=1):
+                text_blob = (
+                    chunk.get("text", "")
+                    + " "
+                    + str(chunk.get("metadata", {}).get("title") or "")
+                    + " "
+                    + str(chunk.get("metadata", {}).get("url") or "")
+                ).lower()
+                if all(term in text_blob for term in expected_top_terms):
+                    rr = 1.0 / index
+                    break
+        elif chunks:
+            rr = 1.0  # No constraint => the very first hit counts.
+        reciprocal_rank_total += rr
+
+        # Cite-rate: did we return at least one source for the answer?
+        if chunks:
+            cite_rate_hits += 1
+        else:
+            # No retrieval => system would (correctly) refuse the answer.
+            refusal_hits += 1
+
         results.append(
             {
                 "id": case.get("id"),
@@ -128,6 +164,8 @@ def evaluate_retrieval_cases(cases: list[dict[str, Any]], rag: Any, top_k: int =
                 "matched_top_terms": matched_top_terms,
                 "expected_terms": expected_terms,
                 "expected_top_terms": expected_top_terms,
+                "recall_at_k": round(recall_at_k, 3),
+                "reciprocal_rank": round(rr, 3),
                 "top_score": chunks[0].get("score", 0) if chunks else 0,
                 "top_sources": [
                     {
@@ -140,12 +178,19 @@ def evaluate_retrieval_cases(cases: list[dict[str, Any]], rag: Any, top_k: int =
                 ],
             }
         )
+    case_count = len(cases) or 1
     return {
         "summary": {
             "case_count": len(cases),
             "passed": passed,
             "failed": len(cases) - passed,
-            "pass_rate": round(passed / len(cases), 3) if cases else 0,
+            "pass_rate": round(passed / case_count, 3),
+            # KPI proxies (see docs/planning/slide-vs-code-alignment.md §5).
+            "recall_at_k": round(recall_at_k_total / case_count, 3),
+            "mrr": round(reciprocal_rank_total / case_count, 3),
+            "cite_rate": round(cite_rate_hits / case_count, 3),
+            "refusal_rate": round(refusal_hits / case_count, 3),
+            "top_k": top_k,
         },
         "results": results,
     }

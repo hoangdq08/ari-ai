@@ -27,6 +27,7 @@ from app.ml_agri_chat.modules.source_policy import source_review_decision, sourc
 from app.ml_agri_chat.modules.taxonomy import CATEGORY_MAP, classify_query, enrich_metadata_with_taxonomy, is_vague_disease_question, taxonomy_payload
 from app.ml_agri_chat.modules.text_cleaning import clean_text
 from app.ml_agri_chat.modules.vision_model import CoffeeVisionClassifier, VisionPrediction
+from app.shared.latency import latency_report as _latency_report
 from app.shared.rate_limit import (
     DEFAULT_ADMIN_LIMIT,
     DEFAULT_CHAT_LIMIT,
@@ -723,6 +724,8 @@ def admin_ops_events(limit: int = 200) -> dict:
     return {
         "events": ACTIVITY_EVENTS[-bounded_limit:],
         "pipelines": _ops_pipeline_status(),
+        # Slide 13 KPI: latency p50 ≤ 3.0s. Real per-route stats live here.
+        "latency": _latency_report(),
     }
 
 
