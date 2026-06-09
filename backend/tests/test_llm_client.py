@@ -446,3 +446,90 @@ def test_ollama_ignores_response_format(monkeypatch):
     )
     assert result.used_fallback is False
     assert "response_format" not in captured["json"]
+
+
+def test_deepseek_retries_on_5xx_and_succeeds(monkeypatch):
+    """503 then 200 -> retry kicks in, returns the 200 text."""
+    mod = _reload_module(
+        monkeypatch,
+        {"DEEPSEEK_API_KEY": "sk-x", "NONGTRI_LLM_FALLBACK": ""},
+    )
+    monkeypatch.setattr(mod.time, "sleep", lambda *_a, **_kw: None)  # no real sleep
+
+    calls = {"n": 0}
+
+    def fake_post(url, headers, json, timeout):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return _StubResponse(status_code=503, text="busy", ok=False)
+        return _StubResponse(
+            json_payload={"choices": [{"message": {"content": "ok"}}]}
+        )
+
+    monkeypatch.setattr(mod.requests, "post", fake_post)
+
+    result = mod.LocalLLMClient().generate("ping")
+    assert result.used_fallback is False
+    assert result.text == "ok"
+    assert calls["n"] == 2  # one retry
+
+
+def test_deepseek_retries_exhausted_returns_fallback(monkeypatch):
+    mod = _reload_module(
+        monkeypatch,
+        {"DEEPSEEK_API_KEY": "sk-x", "NONGTRI_LLM_FALLBACK": ""},
+    )
+    monkeypatch.setattr(mod.time, "sleep", lambda *_a, **_kw: None)
+
+    def fake_post(url, headers, json, timeout):
+        return _StubResponse(status_code=503, text="busy", ok=False)
+
+    monkeypatch.setattr(mod.requests, "post", fake_post)
+
+    result = mod.LocalLLMClient().generate("ping")
+    assert result.used_fallback is True
+    # Final attempt's raise_for_status() lands in HTTPError handler -> we
+    # return the 503 string, not "retries exhausted".
+    assert "503" in (result.error or "")
+
+
+def test_deepseek_4xx_not_retried(monkeypatch):
+    """A 401 must terminate immediately - retrying does not fix auth."""
+    mod = _reload_module(
+        monkeypatch,
+        {"DEEPSEEK_API_KEY": "sk-bad", "NONGTRI_LLM_FALLBACK": ""},
+    )
+    monkeypatch.setattr(mod.time, "sleep", lambda *_a, **_kw: None)
+
+    calls = {"n": 0}
+
+    def fake_post(url, headers, json, timeout):
+        calls["n"] += 1
+        return _StubResponse(status_code=401, text="invalid key", ok=False)
+
+    monkeypatch.setattr(mod.requests, "post", fake_post)
+
+    result = mod.LocalLLMClient().generate("ping")
+    assert result.used_fallback is True
+    assert calls["n"] == 1
+
+
+def test_deepseek_timeout_retries_then_yields(monkeypatch):
+    mod = _reload_module(
+        monkeypatch,
+        {"DEEPSEEK_API_KEY": "sk-x", "NONGTRI_LLM_FALLBACK": ""},
+    )
+    monkeypatch.setattr(mod.time, "sleep", lambda *_a, **_kw: None)
+
+    calls = {"n": 0}
+
+    def fake_post(url, headers, json, timeout):
+        calls["n"] += 1
+        raise mod.requests.Timeout("slow")
+
+    monkeypatch.setattr(mod.requests, "post", fake_post)
+
+    result = mod.LocalLLMClient().generate("ping")
+    assert result.used_fallback is True
+    assert calls["n"] == 3  # initial + 2 retries
+    assert "exhausted" in (result.error or "")

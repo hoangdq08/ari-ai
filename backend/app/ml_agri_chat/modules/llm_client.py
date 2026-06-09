@@ -26,6 +26,7 @@ generation.
 from __future__ import annotations
 
 import os
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
@@ -42,6 +43,13 @@ _DEFAULT_OLLAMA_MODEL = "qwen2.5:3b"
 # 2026-07-24.
 _DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 _DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-flash"
+
+# Retry knobs for transient cloud failures (HTTP 5xx, timeouts). Exponential
+# backoff stays small because the caller can already fall back to the local
+# provider; we only want to absorb 1-2 hiccups before yielding.
+_DEEPSEEK_MAX_RETRIES = 2
+_DEEPSEEK_BACKOFF_BASE_SECONDS = 0.5
+_RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
 
 # Defaults
 _DEFAULT_PRIMARY = "deepseek"
@@ -249,46 +257,75 @@ class _DeepSeekProvider(_Provider):
             # to emit a single valid JSON object. Verified against
             # https://api-docs.deepseek.com (chat/completions schema).
             body["response_format"] = response_format
-        try:
-            response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=self._headers(),
-                json=body,
-                timeout=timeout_override if timeout_override is not None else self.timeout_seconds,
-            )
-            response.raise_for_status()
-            payload: dict[str, Any] = response.json()
-            choices = payload.get("choices") or []
-            if not choices:
+
+        # Retry loop: absorbs up to _DEEPSEEK_MAX_RETRIES transient failures
+        # (timeouts, HTTP 5xx, 429) before yielding to the cascade fallback.
+        # Backoff sleeps are deliberately short because the user is waiting
+        # on the chat response; longer backoff is the fallback's job.
+        last_error: str = "unknown"
+        for attempt in range(_DEEPSEEK_MAX_RETRIES + 1):
+            try:
+                response = requests.post(
+                    f"{self.base_url}/chat/completions",
+                    headers=self._headers(),
+                    json=body,
+                    timeout=timeout_override if timeout_override is not None else self.timeout_seconds,
+                )
+                if response.status_code in _RETRY_STATUS_CODES and attempt < _DEEPSEEK_MAX_RETRIES:
+                    last_error = (
+                        f"HTTP {response.status_code} (attempt {attempt + 1}); retrying"
+                    )
+                    time.sleep(_DEEPSEEK_BACKOFF_BASE_SECONDS * (2 ** attempt))
+                    continue
+                response.raise_for_status()
+                payload: dict[str, Any] = response.json()
+                choices = payload.get("choices") or []
+                if not choices:
+                    return LLMResult(
+                        text="",
+                        provider=self.name,
+                        model=self.model,
+                        used_fallback=True,
+                        error="DeepSeek response missing `choices`.",
+                    )
+                message = (choices[0] or {}).get("message") or {}
+                text = (message.get("content") or "").strip()
+                return LLMResult(text=text, provider=self.name, model=self.model)
+            except requests.HTTPError as exc:
+                # Non-retry status codes (4xx auth errors etc.) terminate immediately.
+                body_snippet = ""
+                if exc.response is not None:
+                    body_snippet = exc.response.text[:200]
+                last_error = (
+                    f"HTTP {exc.response.status_code if exc.response else '?'}: {body_snippet}"
+                ).strip()
                 return LLMResult(
                     text="",
                     provider=self.name,
                     model=self.model,
                     used_fallback=True,
-                    error="DeepSeek response missing `choices`.",
+                    error=last_error,
                 )
-            message = (choices[0] or {}).get("message") or {}
-            text = (message.get("content") or "").strip()
-            return LLMResult(text=text, provider=self.name, model=self.model)
-        except requests.HTTPError as exc:
-            body_snippet = ""
-            if exc.response is not None:
-                body_snippet = exc.response.text[:200]
-            return LLMResult(
-                text="",
-                provider=self.name,
-                model=self.model,
-                used_fallback=True,
-                error=f"HTTP {exc.response.status_code if exc.response else '?'}: {body_snippet}".strip(),
-            )
-        except Exception as exc:
-            return LLMResult(
-                text="",
-                provider=self.name,
-                model=self.model,
-                used_fallback=True,
-                error=str(exc),
-            )
+            except requests.Timeout as exc:
+                last_error = f"timeout (attempt {attempt + 1}): {exc}"
+                if attempt < _DEEPSEEK_MAX_RETRIES:
+                    time.sleep(_DEEPSEEK_BACKOFF_BASE_SECONDS * (2 ** attempt))
+                    continue
+            except Exception as exc:
+                last_error = str(exc)
+                # Network / DNS / connection errors are usually transient.
+                if attempt < _DEEPSEEK_MAX_RETRIES:
+                    time.sleep(_DEEPSEEK_BACKOFF_BASE_SECONDS * (2 ** attempt))
+                    continue
+
+        # Exhausted retries.
+        return LLMResult(
+            text="",
+            provider=self.name,
+            model=self.model,
+            used_fallback=True,
+            error=f"retries exhausted: {last_error}",
+        )
 
     def status(self) -> dict[str, Any]:
         status: dict[str, Any] = {
