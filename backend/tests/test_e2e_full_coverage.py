@@ -6,13 +6,20 @@ failure modes. Together with `test_e2e_flows.py` and
 
 Where an endpoint reaches out to the network (ingest-url, crawl-urls,
 research-*), we stub `requests.get` so the test stays hermetic.
+
+Tests that mutate the on-disk RAG data (reset / ingest / rebuild) use the
+`isolated_data_dir` fixture which copies the committed fixture into a
+per-test tmp directory and rewrites the router's path constants so the
+production data is never touched.
 """
 
 from __future__ import annotations
 
 import importlib
+import shutil
 import uuid
 from io import BytesIO
+from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
@@ -44,6 +51,80 @@ def _boot_app(monkeypatch, **env: str):
     app.add_middleware(SlowAPIMiddleware)
     app.include_router(router_mod.router, prefix="/api/v1/ml-agri")
     return TestClient(app), router_mod
+
+
+@pytest.fixture
+def isolated_data_dir(monkeypatch, tmp_path):
+    """Copy the committed `ml_agri_chat/data/` fixture into a tmp folder and
+    point the router's path constants at it. Returns the tmp Path.
+
+    IMPORTANT: This fixture must be invoked AFTER `_boot_app(...)` reloads the
+    router module — otherwise the reload undoes our patching. Helper
+    `_isolate(client, router_mod, tmp_path)` exists below to compose them in
+    the right order.
+    """
+    raise RuntimeError(
+        "Use _isolate(router_mod, tmp_path) explicitly — see helper below. "
+        "We keep this fixture name only to surface this error if someone forgets."
+    )
+
+
+def _isolate(monkeypatch, router_mod, tmp_path) -> Path:
+    """Rebind router_mod path constants + singletons to a tmp copy of the
+    committed data fixture. Call this AFTER `_boot_app` because that helper
+    reloads the router module and would wipe earlier patches.
+    """
+    source_data_dir = Path(router_mod.DATA_DIR)
+    tmp_data = tmp_path / "data"
+    if tmp_data.exists():
+        shutil.rmtree(tmp_data)
+    shutil.copytree(source_data_dir, tmp_data)
+
+    monkeypatch.setattr(router_mod, "DATA_DIR", tmp_data, raising=False)
+    monkeypatch.setattr(router_mod, "RAW_DIR", tmp_data / "raw_documents", raising=False)
+    monkeypatch.setattr(router_mod, "CLEANED_DIR", tmp_data / "cleaned_documents", raising=False)
+    monkeypatch.setattr(router_mod, "CHUNKS_DIR", tmp_data / "chunks", raising=False)
+    monkeypatch.setattr(router_mod, "VECTOR_DIR", tmp_data / "vector_store", raising=False)
+    monkeypatch.setattr(router_mod, "KB_DIR", tmp_data / "knowledge_base", raising=False)
+    monkeypatch.setattr(router_mod, "CRAWL_CANDIDATE_DIR", tmp_data / "crawl_candidates", raising=False)
+    monkeypatch.setattr(router_mod, "EVALUATION_DIR", tmp_data / "evaluation", raising=False)
+
+    from app.ml_agri_chat.modules.data_ingestion import DataIngestor
+    from app.ml_agri_chat.modules.internet_crawler import InternetCrawler
+    from app.ml_agri_chat.modules.search_discovery import SearchDiscovery
+    from app.ml_agri_chat.modules.rag import AgriculturalRAG
+
+    new_ingestor = DataIngestor(tmp_data / "raw_documents")
+    monkeypatch.setattr(router_mod, "ingestor", new_ingestor, raising=False)
+    monkeypatch.setattr(
+        router_mod,
+        "crawler",
+        InternetCrawler(new_ingestor, tmp_data / "crawl_candidates"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        router_mod,
+        "search_discovery",
+        SearchDiscovery(tmp_data / "crawl_candidates"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        router_mod,
+        "rag",
+        AgriculturalRAG(tmp_data / "vector_store"),
+        raising=False,
+    )
+    return tmp_data
+
+
+def _boot_isolated(monkeypatch, tmp_path, **env: str):
+    """Same as `_boot_app` but afterwards rewires the router to a tmp data dir.
+
+    Returns `(client, router_mod, tmp_data_dir)`.
+    """
+    client, router_mod = _boot_app(monkeypatch, **env)
+    tmp_data = _isolate(monkeypatch, router_mod, tmp_path)
+    return client, router_mod, tmp_data
 
 
 ADMIN_HEADERS = {"X-Admin-Token": "secret-token"}
@@ -173,8 +254,8 @@ def test_rag_evaluate_returns_summary(monkeypatch):
 # 9. Admin: RAG rebuild + 10. Reset (after rebuild we restore by re-seeding).
 # ---------------------------------------------------------------------------
 
-def test_admin_rag_rebuild_index_requires_token(monkeypatch):
-    client, _ = _boot_app(monkeypatch, NONGTRI_ADMIN_TOKEN="secret-token")
+def test_admin_rag_rebuild_index_requires_token(monkeypatch, tmp_path):
+    client, _, _ = _boot_isolated(monkeypatch, tmp_path, NONGTRI_ADMIN_TOKEN="secret-token")
     # Unauthorised first.
     r = client.post("/api/v1/ml-agri/rag-rebuild-index")
     assert r.status_code == 401
@@ -185,11 +266,11 @@ def test_admin_rag_rebuild_index_requires_token(monkeypatch):
     assert "chunks_indexed" in body
 
 
-def test_admin_reset_then_reseed_keeps_endpoints_healthy(monkeypatch):
-    """Calls /admin/reset-rag-data with seed_knowledge_base=True so the
-    on-disk fixture is rebuilt to the seeded baseline rather than wiped to
-    zero. After reset, /sources must still answer 200."""
-    client, _ = _boot_app(monkeypatch, NONGTRI_ADMIN_TOKEN="secret-token")
+def test_admin_reset_then_reseed_keeps_endpoints_healthy(monkeypatch, tmp_path):
+    """Calls /admin/reset-rag-data with seed_knowledge_base=True against an
+    isolated tmp copy of the data fixture. After reset, /sources must still
+    answer 200. The real repo data is untouched."""
+    client, _, _ = _boot_isolated(monkeypatch, tmp_path, NONGTRI_ADMIN_TOKEN="secret-token")
     r = client.post(
         "/api/v1/ml-agri/admin/reset-rag-data",
         json={"seed_knowledge_base": True},
@@ -208,8 +289,8 @@ def test_admin_reset_then_reseed_keeps_endpoints_healthy(monkeypatch):
 # 11. Admin: ingest-document (with a tiny inline text file).
 # ---------------------------------------------------------------------------
 
-def test_admin_ingest_document_with_plain_text(monkeypatch):
-    client, _ = _boot_app(monkeypatch, NONGTRI_ADMIN_TOKEN="secret-token")
+def test_admin_ingest_document_with_plain_text(monkeypatch, tmp_path):
+    client, _, _ = _boot_isolated(monkeypatch, tmp_path, NONGTRI_ADMIN_TOKEN="secret-token")
     # Tiny but non-empty txt payload to satisfy ingest pipeline.
     payload = (
         "Tài liệu thử nghiệm hướng dẫn bón phân cho cà phê vối tại Tây Nguyên. "
@@ -233,8 +314,8 @@ def test_admin_ingest_document_with_plain_text(monkeypatch):
     assert body["status"] in {"ingested", "duplicate"}
 
 
-def test_admin_ingest_document_rejects_empty_file(monkeypatch):
-    client, _ = _boot_app(monkeypatch, NONGTRI_ADMIN_TOKEN="secret-token")
+def test_admin_ingest_document_rejects_empty_file(monkeypatch, tmp_path):
+    client, _, _ = _boot_isolated(monkeypatch, tmp_path, NONGTRI_ADMIN_TOKEN="secret-token")
     files = {"file": ("empty.txt", b"", "text/plain")}
     data = {"source_type": "manual", "reliability_level": "manual"}
     r = client.post(
@@ -246,8 +327,8 @@ def test_admin_ingest_document_rejects_empty_file(monkeypatch):
     assert r.status_code == 400
 
 
-def test_admin_ingest_document_rejects_bad_reliability_level(monkeypatch):
-    client, _ = _boot_app(monkeypatch, NONGTRI_ADMIN_TOKEN="secret-token")
+def test_admin_ingest_document_rejects_bad_reliability_level(monkeypatch, tmp_path):
+    client, _, _ = _boot_isolated(monkeypatch, tmp_path, NONGTRI_ADMIN_TOKEN="secret-token")
     files = {"file": ("note.txt", b"abc xyz", "text/plain")}
     data = {"source_type": "manual", "reliability_level": "GARBAGE"}
     r = client.post(
@@ -292,8 +373,8 @@ def stub_requests(monkeypatch):
     yield
 
 
-def test_admin_ingest_url_with_stubbed_network(monkeypatch, stub_requests):
-    client, _ = _boot_app(monkeypatch, NONGTRI_ADMIN_TOKEN="secret-token")
+def test_admin_ingest_url_with_stubbed_network(monkeypatch, stub_requests, tmp_path):
+    client, _, _ = _boot_isolated(monkeypatch, tmp_path, NONGTRI_ADMIN_TOKEN="secret-token")
     r = client.post(
         "/api/v1/ml-agri/ingest-url",
         json={
@@ -313,8 +394,8 @@ def test_admin_ingest_url_with_stubbed_network(monkeypatch, stub_requests):
 # 13. Admin: crawl-urls (also network stubbed).
 # ---------------------------------------------------------------------------
 
-def test_admin_crawl_urls_with_stubbed_network(monkeypatch, stub_requests):
-    client, _ = _boot_app(monkeypatch, NONGTRI_ADMIN_TOKEN="secret-token")
+def test_admin_crawl_urls_with_stubbed_network(monkeypatch, stub_requests, tmp_path):
+    client, _, _ = _boot_isolated(monkeypatch, tmp_path, NONGTRI_ADMIN_TOKEN="secret-token")
     r = client.post(
         "/api/v1/ml-agri/crawl-urls",
         json={
@@ -335,8 +416,8 @@ def test_admin_crawl_urls_with_stubbed_network(monkeypatch, stub_requests):
 # 14. Admin: research-search (search engines stubbed).
 # ---------------------------------------------------------------------------
 
-def test_admin_research_search_with_stubbed_network(monkeypatch, stub_requests):
-    client, _ = _boot_app(monkeypatch, NONGTRI_ADMIN_TOKEN="secret-token")
+def test_admin_research_search_with_stubbed_network(monkeypatch, stub_requests, tmp_path):
+    client, _, _ = _boot_isolated(monkeypatch, tmp_path, NONGTRI_ADMIN_TOKEN="secret-token")
     r = client.post(
         "/api/v1/ml-agri/research-search",
         json={"query": "bệnh gỉ sắt lá cà phê", "max_results": 5, "auto_crawl": False},
@@ -347,8 +428,8 @@ def test_admin_research_search_with_stubbed_network(monkeypatch, stub_requests):
     assert "candidates" in body
 
 
-def test_admin_research_batch_with_stubbed_network(monkeypatch, stub_requests):
-    client, _ = _boot_app(monkeypatch, NONGTRI_ADMIN_TOKEN="secret-token")
+def test_admin_research_batch_with_stubbed_network(monkeypatch, stub_requests, tmp_path):
+    client, _, _ = _boot_isolated(monkeypatch, tmp_path, NONGTRI_ADMIN_TOKEN="secret-token")
     r = client.post(
         "/api/v1/ml-agri/research-batch",
         json={"queries": ["cà phê tái canh", "phân bón vi sinh"], "max_results": 3, "target_per_query": 2},
