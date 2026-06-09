@@ -217,17 +217,27 @@ function PipelineTimeline({ running, completed, sourceCount, events = [] }) {
       if (name === "ingested") acc.ingested.add(key);
       if (name === "failed") acc.failed.add(key);
       if (name === "chunked") acc.chunked.add(event.source_id || key);
+      // Duplicate / duplicate_skipped events fire when the URL has been
+      // crawled previously. Without tracking them the dashboard reports
+      // "Đã thử tải 1 · Đã nạp 0 · Lỗi 0" and 0% progress, which looks
+      // like a silent failure even though everything worked - the source
+      // was just already on disk.
+      if (name === "duplicate" || name === "duplicate_skipped") acc.duplicate.add(key);
       return acc;
     },
-    { fetching: new Set(), ingested: new Set(), failed: new Set(), chunked: new Set() }
+    { fetching: new Set(), ingested: new Set(), failed: new Set(), chunked: new Set(), duplicate: new Set() }
   );
   const count = {
     fetching: eventCounts.fetching.size,
     ingested: eventCounts.ingested.size,
     failed: eventCounts.failed.size,
     chunked: eventCounts.chunked.size,
+    duplicate: eventCounts.duplicate.size,
   };
-  const processedCount = Math.min(sourceCount, count.ingested + count.failed);
+  // Duplicates count as "processed" - they were attempted, found existing,
+  // and skipped on purpose. Otherwise progress stays at 0% when the user
+  // re-runs the same URL set.
+  const processedCount = Math.min(sourceCount, count.ingested + count.failed + count.duplicate);
   const progressPercent = sourceCount ? Math.min(100, Math.round((processedCount / sourceCount) * 100)) : 0;
   const latestEvent = events[events.length - 1];
   const stageLabel = completed
@@ -240,7 +250,9 @@ function PipelineTimeline({ running, completed, sourceCount, events = [] }) {
           ? "Đang chunk và lập chỉ mục"
           : latestEvent?.event === "failed"
             ? "Ghi nhận nguồn lỗi"
-            : "Chờ sự kiện crawl";
+            : latestEvent?.event === "duplicate" || latestEvent?.event === "duplicate_skipped"
+              ? "Nguồn đã tồn tại, bỏ qua"
+              : "Chờ sự kiện crawl";
 
   return (
     <section className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -266,7 +278,7 @@ function PipelineTimeline({ running, completed, sourceCount, events = [] }) {
             />
           </div>
           <p className="mt-2 text-xs font-semibold text-slate-500">
-            Đã thử tải {count.fetching} · Đã nạp {count.ingested} · Đã chunk {count.chunked} · Lỗi {count.failed}
+            Đã thử tải {count.fetching} · Đã nạp {count.ingested} · Đã chunk {count.chunked} · Đã có sẵn {count.duplicate} · Lỗi {count.failed}
           </p>
         </div>
       </div>
