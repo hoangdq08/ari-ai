@@ -20,7 +20,7 @@ from app.ml_agri_chat.modules.document_chunking import chunk_document
 from app.ml_agri_chat.modules.internet_crawler import InternetCrawler
 from app.ml_agri_chat.modules.intent_classifier import (
     CascadeIntentClassifier,
-    _is_followup_question,
+    is_followup_question,
 )
 from app.ml_agri_chat.modules.llm_advisor import ControlledAdvisor
 from app.ml_agri_chat.modules.logger import get_request_logger
@@ -194,13 +194,18 @@ def _effective_question(question: str, history: list[dict[str, str]]) -> str:
     code cannot drift apart.
     """
     current = " ".join(question.split())
-    if not history or not _is_followup_question(current):
+    if not history or not is_followup_question(current):
         return current
     previous_user = next((item["content"] for item in reversed(history) if item["role"] == "user"), "")
     previous_assistant = next((item["content"] for item in reversed(history) if item["role"] == "assistant"), "")
     context = previous_user or previous_assistant
     if not context:
         return current
+    # Always include the real prior turn so retrieval has the topic. When
+    # the follow-up itself mentions a concrete technical noun (phân, bón,
+    # tưới, ...) we tag the crop too; the previous version short-circuited
+    # to a generic "cây cà phê" string and lost the actual context, which
+    # is what produced the original off-topic answers.
     lowered = current.lower()
     concrete_terms = (
         "phân",
@@ -221,9 +226,10 @@ def _effective_question(question: str, history: list[dict[str, str]]) -> str:
         "chi phí",
         "tiêu chuẩn",
     )
+    enriched = f"{current}\nNgữ cảnh hội thoại trước đó: {context}"
     if any(term in lowered for term in concrete_terms):
-        return f"{current}\nNgữ cảnh hội thoại: cây cà phê."
-    return f"{current}\nNgữ cảnh hội thoại trước đó: {context}"
+        enriched += "\n(thuộc chủ đề cây cà phê)"
+    return enriched
 
 
 @router.post("/chat")
@@ -288,7 +294,19 @@ def chat(request: Request, payload: ChatRequest) -> dict:
         )
         return {**canned, "intent": intent_result.label, "session_id": payload.session_id}
 
-    route = classify_query(effective_question)
+    # For follow-ups, classifying the bare current text (e.g. "chiến chưa")
+    # picks the wrong taxonomy bucket because the topic words live in the
+    # prior turn. Re-use the previous user message's category instead. The
+    # effective_question already carries the prior turn for retrieval, so
+    # the two signals stay in sync.
+    if conversation_history and is_followup_question(payload.question):
+        previous_user = next(
+            (item["content"] for item in reversed(conversation_history) if item["role"] == "user"),
+            "",
+        )
+        route = classify_query(previous_user) if previous_user else classify_query(effective_question)
+    else:
+        route = classify_query(effective_question)
     if is_vague_disease_question(effective_question):
         return {
             "answer": (

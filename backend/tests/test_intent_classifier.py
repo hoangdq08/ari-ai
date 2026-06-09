@@ -315,15 +315,15 @@ def test_stats_starts_empty():
 
 
 def test_followup_detection_basic():
-    """`_is_followup_question` flags deictic / referential phrasings."""
-    from app.ml_agri_chat.modules.intent_classifier import _is_followup_question
-    assert _is_followup_question("vậy còn cây kia thì sao") is True
-    assert _is_followup_question("thế còn cái này") is True
-    assert _is_followup_question("rồi sao nữa") is True
-    assert _is_followup_question("vậy nó?") is True
+    """`is_followup_question` flags deictic / referential phrasings."""
+    from app.ml_agri_chat.modules.intent_classifier import is_followup_question
+    assert is_followup_question("vậy còn cây kia thì sao") is True
+    assert is_followup_question("thế còn cái này") is True
+    assert is_followup_question("rồi sao nữa") is True
+    assert is_followup_question("vậy nó?") is True
     # Plain agri questions are NOT follow-ups.
-    assert _is_followup_question("cây cà phê bị bệnh gì") is False
-    assert _is_followup_question("trồng cà phê khi nào tốt nhất") is False
+    assert is_followup_question("cây cà phê bị bệnh gì") is False
+    assert is_followup_question("trồng cà phê khi nào tốt nhất") is False
 
 
 def test_format_history_renders_role_lines():
@@ -441,7 +441,7 @@ def test_followup_confirmation_patterns():
     user asked about pre-harvest care, then sent 'chiến chưa ?' which
     was being treated as a fresh agri question and retrieved random
     chunks."""
-    from app.ml_agri_chat.modules.intent_classifier import _is_followup_question
+    from app.ml_agri_chat.modules.intent_classifier import is_followup_question
     for prompt in [
         "chiến chưa ?",
         "ok chưa",
@@ -455,14 +455,14 @@ def test_followup_confirmation_patterns():
         "ok",
         "chưa a",
     ]:
-        assert _is_followup_question(prompt) is True, prompt
+        assert is_followup_question(prompt) is True, prompt
 
 
 def test_followup_does_not_swallow_real_agri_questions():
     """Long agri questions that happen to end with 'không' or use a
     deictic pronoun mid-sentence must NOT be flagged - that would
     bypass the L1 cache and burn LLM tokens for every farming question."""
-    from app.ml_agri_chat.modules.intent_classifier import _is_followup_question
+    from app.ml_agri_chat.modules.intent_classifier import is_followup_question
     for prompt in [
         "cây cà phê bị bệnh gì",
         "có nên bón vôi cho cà phê không",
@@ -470,4 +470,4 @@ def test_followup_does_not_swallow_real_agri_questions():
         "trước thu hoạch cà phê tôi cần lưu ý gì",
         "trồng cà phê khi nào tốt nhất",
     ]:
-        assert _is_followup_question(prompt) is False, prompt
+        assert is_followup_question(prompt) is False, prompt

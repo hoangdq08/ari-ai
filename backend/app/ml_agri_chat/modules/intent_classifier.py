@@ -361,12 +361,13 @@ def _format_history(history: list[dict[str, str]] | None) -> str:
     return "\n".join(lines) if lines else "(không có lịch sử)"
 
 
-def _is_followup_question(question: str) -> bool:
-    """Heuristic for follow-up questions that depend on previous context.
+def is_followup_question(question: str) -> bool:
+    """Public detector for follow-up questions that depend on previous
+    context.
 
-    Used by the cascade to escalate to L2 even when L1 would otherwise
-    return high-confidence rejection (e.g. a follow-up that happens to
-    contain an OOS keyword). Token-aware to keep false positives down.
+    Used by both the cascade classifier (to escalate to L2 with the
+    prior turn attached) and the chat router (to rewrite the question
+    before RAG retrieval). Token-aware to keep false positives down.
     """
     compact = _compact(_normalize(question))
     if any(marker in compact for marker in _FOLLOWUP_MARKERS):
@@ -388,6 +389,11 @@ def _is_followup_question(question: str) -> bool:
     if len(words) <= 3 and (words and words[-1] in {"chua", "khong", "ha", "a"}):
         return True
     return False
+
+
+# Backwards-compatible alias kept for one release so external callers (if
+# any) do not break. Internal call sites have moved to the public name.
+_is_followup_question = is_followup_question
 
 
 class _LLMIntentClassifier:
@@ -559,7 +565,7 @@ class CascadeIntentClassifier:
         # so a clearly social ("đi cà phê nha") or OOS follow-up is not
         # forced to the LLM, but we never cache them - the same surface
         # text can mean different things across sessions.
-        is_followup = bool(history) and _is_followup_question(question)
+        is_followup = bool(history) and is_followup_question(question)
 
         if not is_followup:
             cached = self._cache.get(cache_key)
