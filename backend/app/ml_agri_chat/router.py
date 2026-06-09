@@ -750,6 +750,33 @@ def admin_intent_metrics() -> dict:
     return {"intent_classifier": intent_classifier.stats()}
 
 
+@router.post("/admin/rag-reembed-all", dependencies=[Depends(require_admin_token)])
+def admin_rag_reembed_all() -> dict:
+    """Force every chunk in the vector store to be re-embedded with the
+    currently active embedding provider.
+
+    Useful after switching `NONGTRI_EMBEDDING_PROVIDER` or when the index
+    drifts from the source chunks. The auto-migration in
+    `EmbeddingStore._load()` also re-embeds on version mismatch at startup,
+    but this endpoint lets ops trigger the same work without a restart.
+    """
+    updated = rag.store.reembed_all()
+    _log_activity(
+        "system",
+        "chunking",
+        "rag_reembed_all",
+        "All vector store chunks re-embedded with active provider",
+        {
+            "updated": updated,
+            "embedding_version": rag.store.embedding_version,
+        },
+    )
+    return {
+        "updated": updated,
+        "embedding_version": rag.store.embedding_version,
+    }
+
+
 @router.post("/admin/reset-rag-data", dependencies=[Depends(require_admin_token)])
 @limiter.limit(DEFAULT_ADMIN_LIMIT)
 def reset_rag_data(request: Request, payload: ResetDataRequest) -> dict:
