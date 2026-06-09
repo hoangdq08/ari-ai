@@ -40,6 +40,16 @@ def _boot_app(monkeypatch, **env: str):
     import app.shared.rate_limit as rl_mod
     importlib.reload(upload_mod)
     importlib.reload(rl_mod)
+    # router.py now re-exports from _routes/_shared.py + _routes/_helpers.py.
+    # The shared module owns the FastAPI APIRouter instance and the
+    # singletons, so we have to reload it before reloading router.py;
+    # otherwise router.py picks up the new limiter from rl_mod but
+    # re-registers handlers against the stale APIRouter from a previous
+    # test run, and rate-limit decorators never see the env override.
+    import app.ml_agri_chat._routes._shared as shared_mod
+    import app.ml_agri_chat._routes._helpers as helpers_mod
+    importlib.reload(shared_mod)
+    importlib.reload(helpers_mod)
     import app.ml_agri_chat.router as router_mod
     importlib.reload(router_mod)
 

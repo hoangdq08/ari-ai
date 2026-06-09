@@ -43,6 +43,12 @@ def _boot_app(monkeypatch):
 
     importlib.reload(upload_mod)
     importlib.reload(rl_mod)
+    # See test_e2e_flows._boot_app for why _routes/_shared must reload first.
+    import app.ml_agri_chat._routes._shared as shared_mod
+    import app.ml_agri_chat._routes._helpers as helpers_mod
+
+    importlib.reload(shared_mod)
+    importlib.reload(helpers_mod)
     import app.ml_agri_chat.router as router_mod
 
     importlib.reload(router_mod)

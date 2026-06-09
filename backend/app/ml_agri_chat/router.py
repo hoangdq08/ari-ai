@@ -42,120 +42,72 @@ from app.shared.rate_limit import (
 )
 from app.shared.upload import max_document_bytes, max_image_bytes, read_upload_capped
 
-
-BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
-RAW_DIR = DATA_DIR / "raw_documents"
-CLEANED_DIR = DATA_DIR / "cleaned_documents"
-CHUNKS_DIR = DATA_DIR / "chunks"
-VECTOR_DIR = DATA_DIR / "vector_store"
-KB_DIR = DATA_DIR / "knowledge_base"
-CRAWL_CANDIDATE_DIR = DATA_DIR / "crawl_candidates"
-EVALUATION_DIR = DATA_DIR / "evaluation"
-ML_PIPELINE_DIR = BASE_DIR / "ml_pipeline"
-CRAWLER_DIR = ML_PIPELINE_DIR / "crawler"
-IMAGE_DATASET_DIR = ML_PIPELINE_DIR / "dataset"
-REPORTS_DIR = ML_PIPELINE_DIR / "reports"
-
-for directory in [RAW_DIR, CLEANED_DIR, CHUNKS_DIR, VECTOR_DIR, KB_DIR, CRAWL_CANDIDATE_DIR, EVALUATION_DIR]:
-    directory.mkdir(parents=True, exist_ok=True)
-
-ingestor = DataIngestor(RAW_DIR)
-crawler = InternetCrawler(ingestor, CRAWL_CANDIDATE_DIR)
-search_discovery = SearchDiscovery(CRAWL_CANDIDATE_DIR)
-rag = AgriculturalRAG(VECTOR_DIR)
-advisor = ControlledAdvisor()
-intent_classifier = CascadeIntentClassifier(advisor.llm_client)
-classifier = CoffeeVisionClassifier(ML_PIPELINE_DIR / "models" / "coffee_disease_model.keras")
-CRAWL_EVENTS: list[dict] = []
-ACTIVITY_EVENTS: list[dict] = []
-
-# In-memory event ring buffers — capped to prevent memory leak (see audit C10).
-MAX_CRAWL_EVENTS = int(os.getenv("NONGTRI_MAX_CRAWL_EVENTS", "500"))
-MAX_ACTIVITY_EVENTS = int(os.getenv("NONGTRI_MAX_ACTIVITY_EVENTS", "1000"))
-
-# Upload size limits resolved once at import; tweak via env vars.
-MAX_IMAGE_BYTES = max_image_bytes()
-MAX_DOCUMENT_BYTES = max_document_bytes()
-
-router = APIRouter()
-
-
-def require_admin_token(x_admin_token: Optional[str] = Header(default=None)) -> None:
-    """Simple admin auth via shared secret in `X-Admin-Token` header.
-
-    If `NONGTRI_ADMIN_TOKEN` is unset, admin endpoints are disabled (return 503)
-    to fail closed by default. Set it in env to enable.
-    """
-    expected = os.getenv("NONGTRI_ADMIN_TOKEN", "").strip()
-    if not expected:
-        raise HTTPException(status_code=503, detail="Admin endpoints are disabled (NONGTRI_ADMIN_TOKEN unset).")
-    if not x_admin_token or x_admin_token.strip() != expected:
-        raise HTTPException(status_code=401, detail="Invalid or missing X-Admin-Token.")
-
-
-def _short_hash(value: str) -> str:
-    """Return a short fingerprint for log correlation without exposing content."""
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
-
-
-class ChatHistoryMessage(BaseModel):
-    role: str = Field(pattern="^(user|assistant|ai)$")
-    content: str = Field(min_length=1, max_length=2000)
-
-
-class ChatRequest(BaseModel):
-    question: str = Field(min_length=2)
-    top_k: int = Field(default=5, ge=1, le=10)
-    session_id: Optional[str] = None
-    history: list[ChatHistoryMessage] = Field(default_factory=list, max_length=12)
-
-
-class IngestUrlRequest(BaseModel):
-    url: str
-    title: Optional[str] = None
-    reliability_level: str = Field(default="internet", pattern="^(official|semi_official|internet|manual)$")
-
-
-class CrawlUrlsRequest(BaseModel):
-    urls: list[str] = Field(min_length=1)
-    reliability_level: str = Field(default="internet", pattern="^(official|semi_official|internet|manual)$")
-    max_pages: int = Field(default=10, ge=1)
-    collect_links: bool = False
-    same_domain_only: bool = True
-    # When `True`, the crawler bypasses duplicate detection on already-stored
-    # raw documents and overwrites them with the freshly fetched content.
-    # The previous raw file is backed up to <source_id>.json.bak so a bad
-    # refresh can be rolled back. Defaults to False so the historical
-    # "skip if already crawled" UX is the safe default.
-    force: bool = False
-
-
-class ResearchSearchRequest(BaseModel):
-    query: str = Field(min_length=2)
-    max_results: int = Field(default=50, ge=1, le=500)
-    auto_crawl: bool = False
-    crawl_top_k: int = Field(default=3, ge=1, le=10)
-
-
-class ResearchBatchRequest(BaseModel):
-    queries: list[str] = Field(min_length=1, max_length=100)
-    max_results: int = Field(default=50, ge=1, le=500)
-    target_per_query: int = Field(default=6, ge=1, le=20)
-
-
-class FeedbackRequest(BaseModel):
-    request_id: str
-    feedback: str = Field(pattern="^(correct|incorrect|unclear)$")
-    notes: Optional[str] = None
-
-
-class RagEvaluateRequest(BaseModel):
-    top_k: int = Field(default=5, ge=1, le=10)
-
-
-class ResetDataRequest(BaseModel):
-    seed_knowledge_base: bool = False
+# Shared state, paths, singletons, and Pydantic models live in `_routes/_shared.py`
+# so the per-domain route modules can register against the same `router`
+# object without pulling 1300 lines of this file. The names imported below
+# are re-exported here so existing call sites (e.g. tests doing
+# `app.ml_agri_chat.router.rag`) keep working.
+from app.ml_agri_chat._routes._shared import (
+    ACTIVITY_EVENTS,
+    BASE_DIR,
+    CHUNKS_DIR,
+    CLEANED_DIR,
+    CRAWL_CANDIDATE_DIR,
+    CRAWL_EVENTS,
+    CRAWLER_DIR,
+    ChatHistoryMessage,
+    ChatRequest,
+    CrawlUrlsRequest,
+    DATA_DIR,
+    EVALUATION_DIR,
+    FeedbackRequest,
+    IMAGE_DATASET_DIR,
+    IngestUrlRequest,
+    KB_DIR,
+    MAX_ACTIVITY_EVENTS,
+    MAX_CRAWL_EVENTS,
+    MAX_DOCUMENT_BYTES,
+    MAX_IMAGE_BYTES,
+    ML_PIPELINE_DIR,
+    RAW_DIR,
+    REPORTS_DIR,
+    RagEvaluateRequest,
+    ResearchBatchRequest,
+    ResearchSearchRequest,
+    ResetDataRequest,
+    VECTOR_DIR,
+    advisor,
+    crawler,
+    ingestor,
+    intent_classifier,
+    log_activity as _log_activity,
+    log_crawl_event as _log_crawl_event,
+    rag,
+    require_admin_token,
+    router,
+    search_discovery,
+    short_hash as _short_hash,
+    vision_classifier as classifier,
+)
+from app.ml_agri_chat._routes._helpers import (
+    chunk_previews as _chunk_previews,
+    chunks_for_trusted_rebuild as _chunks_for_trusted_rebuild,
+    clean_chunk_store as _clean_chunk_store,
+    clear_directory as _clear_directory,
+    count_class_files as _count_class_files,
+    count_files as _count_files,
+    count_json_chunks as _count_json_chunks,
+    count_rejected as _count_rejected,
+    duplicate_result as _duplicate_result,
+    ensure_taxonomy_labels as _ensure_taxonomy_labels,
+    existing_chunk_count as _existing_chunk_count,
+    indexing_quality_score as _indexing_quality_score,
+    indexing_warnings as _indexing_warnings,
+    ops_pipeline_status as _ops_pipeline_status,
+    read_csv_file as _read_csv_file,
+    read_json_file as _read_json_file,
+    seed_knowledge_base_if_needed as _seed_knowledge_base_if_needed,
+)
 
 
 @router.on_event("startup")
@@ -1061,294 +1013,4 @@ async def diagnose_image(request: Request, file: UploadFile = File(...)) -> dict
             "observed_symptoms": prediction.observed_symptoms,
         },
         "rag_advice": rag_advice,
-    }
-
-
-def _clean_chunk_store(source_id: str, raw_text: str, metadata: dict) -> dict:
-    cleaned = clean_text(raw_text)
-    with (CLEANED_DIR / f"{source_id}.txt").open("w", encoding="utf-8") as handle:
-        handle.write(cleaned)
-
-    enriched_metadata = enrich_metadata_with_taxonomy(metadata, cleaned)
-    warnings = _indexing_warnings(enriched_metadata, raw_text, cleaned)
-    quality_score = _indexing_quality_score(enriched_metadata, raw_text, cleaned, warnings)
-    review = source_review_decision(enriched_metadata, quality_score, warnings)
-    enriched_metadata.update(
-        {
-            "quality_score": round(quality_score, 3),
-            "warnings": warnings,
-            **review,
-        }
-    )
-    chunks = chunk_document(cleaned, enriched_metadata)
-    chunk_dicts = [chunk.to_dict() for chunk in chunks]
-    with (CHUNKS_DIR / f"{source_id}.json").open("w", encoding="utf-8") as handle:
-        json.dump(chunk_dicts, handle, ensure_ascii=False, indent=2)
-
-    added = 0
-    if review["indexing_status"] == "indexed":
-        added = rag.add_chunks(chunk_dicts)
-    return {
-        "status": "ingested",
-        "source_id": source_id,
-        "chunks_created": len(chunks),
-        "chunks_added": added,
-        "review_status": review["review_status"],
-        "indexing_status": review["indexing_status"],
-        "quality_score": round(quality_score, 3),
-        "warnings": warnings,
-    }
-
-
-def _indexing_warnings(metadata: dict, raw_text: str, cleaned: str) -> list[str]:
-    warnings = []
-    if len(cleaned) < 500:
-        warnings.append("cleaned_text_too_short")
-    if len(raw_text) > 0 and len(cleaned) / len(raw_text) < 0.15:
-        warnings.append("too_much_text_removed")
-    warnings.extend(source_warnings(metadata.get("title"), metadata.get("url"), cleaned))
-    return list(dict.fromkeys(warnings))
-
-
-def _indexing_quality_score(metadata: dict, raw_text: str, cleaned: str, warnings: list[str]) -> float:
-    reliability = metadata.get("reliability_level") or "internet"
-    score = 1.0
-    score -= {"official": 0.0, "semi_official": 0.08, "manual": 0.05, "internet": 0.22}.get(reliability, 0.22)
-    score -= min(0.5, len(warnings) * 0.08)
-    if len(cleaned) < 500:
-        score -= 0.18
-    if len(raw_text) > 0 and len(cleaned) / len(raw_text) < 0.15:
-        score -= 0.12
-    return max(0.0, min(1.0, score))
-
-
-def _chunks_for_trusted_rebuild(source_id: str, chunks: object) -> tuple[list[dict], dict]:
-    if not isinstance(chunks, list) or not chunks:
-        return [], {"indexing_status": "held_for_review", "review_status": "needs_review"}
-    valid_chunks = [chunk for chunk in chunks if isinstance(chunk, dict)]
-    if not valid_chunks:
-        return [], {"indexing_status": "held_for_review", "review_status": "needs_review"}
-
-    metadata = dict(valid_chunks[0].get("metadata") or {})
-    if metadata.get("indexing_status") == "indexed" or metadata.get("review_status") == "approved":
-        return valid_chunks, {"indexing_status": "indexed", "review_status": "approved"}
-    if metadata.get("indexing_status") == "blocked" or metadata.get("review_status") == "rejected":
-        return [], {"indexing_status": "blocked", "review_status": "rejected"}
-    if metadata.get("indexing_status") == "held_for_review" or metadata.get("review_status") == "needs_review":
-        return [], {"indexing_status": "held_for_review", "review_status": "needs_review"}
-
-    joined_text = "\n".join(str(chunk.get("text") or "") for chunk in valid_chunks)
-    warnings = _indexing_warnings(metadata, "", joined_text)
-    quality_score = _indexing_quality_score(metadata, "", joined_text, warnings)
-    decision = source_review_decision(metadata, quality_score, warnings)
-    if decision["indexing_status"] != "indexed":
-        return [], decision
-
-    enriched_chunks = []
-    for chunk in valid_chunks:
-        chunk_copy = dict(chunk)
-        chunk_metadata = dict(chunk_copy.get("metadata") or {})
-        chunk_metadata.update(
-            {
-                "source_id": chunk_metadata.get("source_id") or source_id,
-                "quality_score": round(quality_score, 3),
-                "warnings": warnings,
-                **decision,
-            }
-        )
-        chunk_copy["metadata"] = chunk_metadata
-        enriched_chunks.append(chunk_copy)
-    return enriched_chunks, decision
-
-
-def _duplicate_result(ingested: IngestedDocument) -> dict:
-    return {
-        "status": "duplicate",
-        "source_id": ingested.source_id,
-        "duplicate_of": ingested.duplicate_of or ingested.source_id,
-        "chunks_created": _existing_chunk_count(ingested.source_id),
-        "chunks_added": 0,
-        "message": "Source already exists; skipped raw/chunk/vector write.",
-    }
-
-
-def _existing_chunk_count(source_id: str) -> int:
-    chunks = _read_json_file(CHUNKS_DIR / f"{source_id}.json", default=[])
-    return len(chunks) if isinstance(chunks, list) else 0
-
-
-def _seed_knowledge_base_if_needed() -> None:
-    if rag.sources():
-        return
-    for path in sorted(KB_DIR.glob("*.json")):
-        with path.open("r", encoding="utf-8") as handle:
-            item = json.load(handle)
-        metadata = {
-            "source_id": path.stem,
-            "source_type": item.get("source_type", "manual"),
-            "title": item.get("title", path.stem),
-            "file_name": path.name,
-            "url": None,
-            "page": None,
-            "reliability_level": item.get("reliability_level", "manual"),
-            "seed_sample": True,
-        }
-        _clean_chunk_store(path.stem, item.get("text", ""), metadata)
-
-
-def _ensure_taxonomy_labels() -> None:
-    changed = False
-    chunk_dicts: list[dict] = []
-    for path in sorted(CHUNKS_DIR.glob("*.json")):
-        chunks = _read_json_file(path, default=[])
-        if not isinstance(chunks, list):
-            continue
-        file_changed = False
-        for chunk in chunks:
-            metadata = chunk.get("metadata", {})
-            if not metadata.get("category"):
-                enriched = enrich_metadata_with_taxonomy(metadata, chunk.get("text", ""))
-                chunk["metadata"] = enriched
-                file_changed = True
-        if file_changed:
-            with path.open("w", encoding="utf-8") as handle:
-                json.dump(chunks, handle, ensure_ascii=False, indent=2)
-            changed = True
-        indexable, _decision = _chunks_for_trusted_rebuild(path.stem, chunks)
-        chunk_dicts.extend(indexable)
-    if changed and chunk_dicts:
-        rag.rebuild(chunk_dicts)
-
-
-def _read_json_file(path: Path, default):
-    if not path.exists():
-        return default
-    with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
-
-
-def _read_csv_file(path: Path) -> list[dict]:
-    if not path.exists():
-        return []
-    with path.open("r", encoding="utf-8") as handle:
-        return list(csv.DictReader(handle))
-
-
-def _count_files(root: Path, suffixes: set[str]) -> int:
-    if not root.exists():
-        return 0
-    return sum(1 for item in root.rglob("*") if item.is_file() and item.suffix.lower() in suffixes)
-
-
-def _count_json_chunks(root: Path) -> int:
-    total = 0
-    for path in root.glob("*.json"):
-        data = _read_json_file(path, default=[])
-        if isinstance(data, list):
-            total += len(data)
-    return total
-
-
-def _chunk_previews(path: Path) -> list[dict]:
-    chunks = _read_json_file(path, default=[])
-    if not isinstance(chunks, list):
-        return []
-    return [
-        {
-            "chunk_id": chunk.get("chunk_id"),
-            "text": (chunk.get("text") or "")[:900],
-            "char_count": len(chunk.get("text") or ""),
-        }
-        for chunk in chunks[:12]
-    ]
-
-
-def _count_class_files(root: Path) -> dict[str, int]:
-    if not root.exists():
-        return {}
-    counts: dict[str, int] = {}
-    for class_dir in sorted(path for path in root.iterdir() if path.is_dir()):
-        counts[class_dir.name] = sum(1 for item in class_dir.rglob("*") if item.is_file() and item.name != ".gitkeep")
-    return counts
-
-
-def _count_rejected(root: Path) -> dict[str, int]:
-    if not root.exists():
-        return {}
-    counts: dict[str, int] = {}
-    for reason_dir in sorted(path for path in root.iterdir() if path.is_dir()):
-        counts[reason_dir.name] = sum(1 for item in reason_dir.rglob("*") if item.is_file())
-    return counts
-
-
-def _clear_directory(directory: Path) -> None:
-    directory.mkdir(parents=True, exist_ok=True)
-    for path in directory.iterdir():
-        if path.name == ".gitkeep":
-            continue
-        if path.is_file():
-            path.unlink()
-        elif path.is_dir():
-            _clear_directory(path)
-            path.rmdir()
-
-
-def _log_crawl_event(request_id: str, event: dict) -> None:
-    CRAWL_EVENTS.append(
-        {
-            "logged_at": datetime.now(timezone.utc).isoformat(),
-            "request_id": request_id,
-            **event,
-        }
-    )
-    _log_activity(
-        request_id,
-        "crawl",
-        str(event.get("event") or event.get("status") or "event"),
-        event.get("title") or event.get("url") or event.get("source_id") or "Crawler event",
-        {key: value for key, value in event.items() if key not in {"title"}},
-    )
-    if len(CRAWL_EVENTS) > MAX_CRAWL_EVENTS:
-        del CRAWL_EVENTS[: len(CRAWL_EVENTS) - MAX_CRAWL_EVENTS]
-
-
-def _log_activity(request_id: str, stream: str, event: str, message: str, payload: dict | None = None) -> None:
-    ACTIVITY_EVENTS.append(
-        {
-            "logged_at": datetime.now(timezone.utc).isoformat(),
-            "request_id": request_id,
-            "stream": stream,
-            "event": event,
-            "message": message,
-            "payload": payload or {},
-        }
-    )
-    if len(ACTIVITY_EVENTS) > MAX_ACTIVITY_EVENTS:
-        del ACTIVITY_EVENTS[: len(ACTIVITY_EVENTS) - MAX_ACTIVITY_EVENTS]
-
-
-def _ops_pipeline_status() -> dict:
-    raw_docs = _count_files(RAW_DIR, {".json", ".txt", ".pdf", ".docx", ".html", ".htm"})
-    cleaned_docs = _count_files(CLEANED_DIR, {".txt"})
-    chunk_files = len(list(CHUNKS_DIR.glob("*.json")))
-    chunk_count = _count_json_chunks(CHUNKS_DIR)
-    vector_chunks = len(_read_json_file(VECTOR_DIR / "chunks.json", default=[]))
-    raw_images = sum(_count_class_files(IMAGE_DATASET_DIR / "raw").values())
-    clean_images = sum(_count_class_files(IMAGE_DATASET_DIR / "cleaned").values())
-    rejected_images = sum(_count_rejected(IMAGE_DATASET_DIR / "rejected").values())
-    model_path = ML_PIPELINE_DIR / "models" / "coffee_disease_model.keras"
-    label_map_path = ML_PIPELINE_DIR / "models" / "label_map.json"
-    return {
-        "rag_chunking": [
-            {"step": "raw_documents", "label": "Raw documents", "count": raw_docs, "status": "done" if raw_docs else "waiting"},
-            {"step": "cleaned_documents", "label": "Cleaned text", "count": cleaned_docs, "status": "done" if cleaned_docs else "waiting"},
-            {"step": "chunk_files", "label": "Chunk files", "count": chunk_files, "status": "done" if chunk_files else "waiting"},
-            {"step": "vector_chunks", "label": "Vector chunks", "count": vector_chunks, "status": "done" if vector_chunks else "waiting"},
-        ],
-        "vision_training": [
-            {"step": "raw_images", "label": "Raw images", "count": raw_images, "status": "done" if raw_images else "waiting"},
-            {"step": "clean_images", "label": "Cleaned images", "count": clean_images, "status": "done" if clean_images else "waiting"},
-            {"step": "rejected_images", "label": "Rejected images", "count": rejected_images, "status": "review" if rejected_images else "waiting"},
-            {"step": "model_export", "label": "Model artifact", "count": int(model_path.exists()), "status": "done" if model_path.exists() and label_map_path.exists() else "placeholder"},
-        ],
     }
