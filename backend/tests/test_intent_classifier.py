@@ -113,8 +113,6 @@ class _StubLLM:
         self._text = text
         self._error = error
         self._enabled = enabled
-        self.last_call_provider = "deepseek"
-        self.last_call_model = "deepseek-v4-flash"
 
     def is_enabled(self) -> bool:
         return self._enabled

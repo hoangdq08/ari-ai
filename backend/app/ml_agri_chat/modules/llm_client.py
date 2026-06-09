@@ -15,9 +15,12 @@ Supported provider names:
 
 The public surface (`LocalLLMClient`, `LLMResult`) is preserved so existing
 callers (`llm_advisor.ControlledAdvisor`, `router.health`) keep working.
-After every `generate()` call, `LocalLLMClient.last_call_provider` /
-`last_call_model` reflect *which* provider actually served the response, so
-diagnostic blocks downstream can log the truth (not the configured primary).
+Each call returns a fresh `LLMResult` whose `provider`/`model` fields
+reflect the provider that actually served the response (so logs stay
+truthful even when fallback fires). The previous `last_call_provider`
+mutable attribute was removed to avoid concurrent-request races when
+the same client is shared by intent classification and answer
+generation.
 """
 
 from __future__ import annotations
@@ -353,12 +356,15 @@ class LocalLLMClient:
     Public attributes preserved for backward compatibility:
     - `provider`, `model`, `enabled`, `is_enabled()`
     - `generate(prompt, *, temperature)`
-    - `status()` (shape changed: now returns `{primary, fallback}`)
+    - `status()` (shape: `{primary, fallback}`)
 
-    Added:
-    - `last_call_provider`, `last_call_model`: the provider that actually
-      served the most recent `generate()` call. Defaults to the primary
-      until the first call.
+    Every call returns a `LLMResult` whose `.provider` / `.model` reflect
+    the provider that actually served the response, so callers
+    (`llm_advisor`) log the truthful source even when fallback fires.
+    Removed: `last_call_provider`/`last_call_model` mutable attrs. They
+    introduced a race when one `LocalLLMClient` instance was shared by
+    intent classification and answer generation under concurrent
+    requests.
     """
 
     def __init__(self) -> None:
@@ -417,9 +423,6 @@ class LocalLLMClient:
         self.provider = self._primary.name
         self.model = self._primary.model
         self.base_url = getattr(self._primary, "base_url", "")
-        # Mutable attrs reflecting the most recent generate() call.
-        self.last_call_provider = self.provider
-        self.last_call_model = self.model
 
     def is_enabled(self) -> bool:
         return self.enabled
@@ -439,8 +442,6 @@ class LocalLLMClient:
             response_format=response_format,
         )
         if not result.used_fallback or self._fallback is None:
-            self.last_call_provider = result.provider
-            self.last_call_model = result.model
             return result
 
         # Primary failed at runtime. Try fallback.
@@ -454,16 +455,10 @@ class LocalLLMClient:
         if fallback_result.used_fallback:
             # Both failed. Report aggregated error; keep primary-shaped
             # provider/model so logs still show the intended chain.
-            self.last_call_provider = (
-                f"{self._primary.name}->{self._fallback.name}"
-            )
-            self.last_call_model = (
-                f"{self._primary.model}|{self._fallback.model}"
-            )
             return LLMResult(
                 text="",
-                provider=self.last_call_provider,
-                model=self.last_call_model,
+                provider=f"{self._primary.name}->{self._fallback.name}",
+                model=f"{self._primary.model}|{self._fallback.model}",
                 used_fallback=True,
                 error=(
                     f"primary {self._primary.name} failed: {primary_error}; "
@@ -473,9 +468,7 @@ class LocalLLMClient:
             )
 
         # Fallback served the response. Surface that explicitly so callers
-        # log the truthful provider/model.
-        self.last_call_provider = fallback_result.provider
-        self.last_call_model = fallback_result.model
+        # log the truthful provider/model via LLMResult.
         return LLMResult(
             text=fallback_result.text,
             provider=fallback_result.provider,

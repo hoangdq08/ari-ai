@@ -6,7 +6,7 @@ Covers:
 - Fallback fired (cloud fail -> local served)
 - Both providers down (aggregated error)
 - Disabled / unknown provider
-- last_call_provider/model accuracy
+- Provider/model fields on LLMResult accuracy
 
 No real network calls: `requests.post` / `requests.get` are monkeypatched
 per-test.
@@ -201,7 +201,8 @@ def test_deepseek_generate_success(monkeypatch):
     assert captured["url"] == "https://api.deepseek.com/chat/completions"
     assert captured["headers"]["Authorization"] == "Bearer sk-test-123"
     assert captured["json"]["messages"] == [{"role": "user", "content": "ping"}]
-    assert client.last_call_provider == "deepseek"
+    assert result.provider == "deepseek"
+    assert result.model == "deepseek-v4-flash"
 
 
 def test_deepseek_http_error_no_fallback(monkeypatch):
@@ -291,9 +292,10 @@ def test_fallback_fires_when_primary_runtime_fail(monkeypatch):
     # Error string surfaces *why* we fell back, for ops debugging.
     assert "primary deepseek unavailable" in (result.error or "")
     assert "served by fallback ollama" in (result.error or "")
-    # last_call_* reflects the real source.
-    assert client.last_call_provider == "ollama"
-    assert client.last_call_model == "qwen2.5:3b"
+    # LLMResult.provider/model reflect the real source even when fallback
+    # served the response.
+    assert result.provider == "ollama"
+    assert result.model == "qwen2.5:3b"
 
 
 def test_fallback_both_fail_aggregates_error(monkeypatch):
