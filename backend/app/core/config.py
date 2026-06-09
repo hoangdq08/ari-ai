@@ -3,10 +3,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Nông Trí AI Backend"
     API_V1_STR: str = "/api/v1"
-    
-    # AI Config
-    GEMINI_API_KEY: str = ""
-    
+
     # CORS
     BACKEND_CORS_ORIGINS: list[str] = [
         "http://localhost:8080",

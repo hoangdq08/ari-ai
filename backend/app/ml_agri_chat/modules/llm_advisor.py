@@ -97,6 +97,7 @@ class ControlledAdvisor:
                 "sources": [],
                 "confidence_level": "thap",
                 "llm": {
+                    # Configured primary; no LLM call was made here.
                     "provider": self.llm_client.provider,
                     "model": self.llm_client.model,
                     "used_fallback": True,
