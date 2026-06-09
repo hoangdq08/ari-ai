@@ -6,8 +6,24 @@ from typing import Any
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
 from app.core.config import settings
+from app.shared.rate_limit import limiter
+
+
+def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    return JSONResponse(
+        status_code=429,
+        content={
+            "status": "error",
+            "message": "Quá nhiều yêu cầu, vui lòng thử lại sau ít phút.",
+            "detail": str(exc.detail) if hasattr(exc, "detail") else "rate_limited",
+        },
+    )
+
 
 def get_application() -> FastAPI:
     application = FastAPI(
@@ -16,6 +32,11 @@ def get_application() -> FastAPI:
         docs_url=f"{settings.API_V1_STR}/docs",
         redoc_url=f"{settings.API_V1_STR}/redoc",
     )
+
+    # Rate limiter wiring (process-local; see app.shared.rate_limit for storage notes).
+    application.state.limiter = limiter
+    application.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
+    application.add_middleware(SlowAPIMiddleware)
 
     # Set all CORS enabled origins
     if settings.BACKEND_CORS_ORIGINS:
@@ -27,19 +48,15 @@ def get_application() -> FastAPI:
             allow_headers=["*"],
         )
 
-    # Khai báo các Routers từ Presentation Layers
-    from app.modules.chat.presentation.router import router as chat_router
-    from app.modules.diagnostics.presentation.router import router as diagnostics_router
-    from app.modules.handbook.presentation.router import router as handbook_router
+    # Đăng ký các Routers từ Presentation Layers. Chỉ còn module `ml_agri_chat`
+    # vận hành thật; các mock module cũ (chat/handbook/diagnostics) đã được gỡ
+    # khỏi codebase vì chỉ trả response cứng và dễ gây hiểu lầm.
     try:
         from app.ml_agri_chat.router import router as ml_agri_router
     except ModuleNotFoundError as exc:
         missing_dependency = exc.name
         ml_agri_router = _build_ml_agri_fallback_router(missing_dependency)
 
-    application.include_router(chat_router, prefix=f"{settings.API_V1_STR}/chat", tags=["Chat"])
-    application.include_router(diagnostics_router, prefix=f"{settings.API_V1_STR}/diagnostics", tags=["Diagnostics"])
-    application.include_router(handbook_router, prefix=f"{settings.API_V1_STR}/handbook", tags=["Handbook"])
     application.include_router(ml_agri_router, prefix=f"{settings.API_V1_STR}/ml-agri", tags=["ML-Agri Chat Admin"])
     return application
 
@@ -59,7 +76,7 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
     )
 
 def health_check():
-    return {"status": "ok", "message": "ArgiAI Backend is running!"}
+    return {"status": "ok", "message": "Nông Trí AI Backend is running!"}
 
 
 def _build_ml_agri_fallback_router(missing_dependency: str) -> APIRouter:
@@ -399,7 +416,7 @@ def _counter_dict(items) -> dict[str, int]:
     return counts
 
 
-def _avg(values: list[int | float]) -> float:
+def _avg(values: "list[int | float]") -> float:
     return sum(values) / len(values) if values else 0.0
 
 

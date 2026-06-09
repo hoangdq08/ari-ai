@@ -19,12 +19,18 @@ export const useChat = () => {
     
     try {
       const response = await chatApiRepository.sendMessage(text);
-      
+
+      const primarySource = response.sources[0];
       addMessage({
         id: (Date.now() + 1).toString(),
         role: "ai",
         content: response.reply,
-        citation: response.sources.length > 0 ? response.sources[0] : undefined
+        citation: primarySource
+          ? primarySource.url
+            ? `${primarySource.title} (${primarySource.url})`
+            : primarySource.title
+          : undefined,
+        sources: response.sources,
       });
     } catch (error) {
       console.error("Lỗi khi gửi tin nhắn:", error);

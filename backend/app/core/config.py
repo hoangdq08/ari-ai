@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "ArgiAI Backend"
+    PROJECT_NAME: str = "Nông Trí AI Backend"
     API_V1_STR: str = "/api/v1"
     
     # AI Config

@@ -17,10 +17,12 @@ Dự án được cấu trúc theo mô hình **Microservices**, phân tách rõ 
 ### ⚙️ Phân hệ Backend
 - **Framework:** FastAPI (Python), Async.
 - **Kiến trúc:** Domain-Driven Design (DDD) + Clean Architecture + Dependency Injection (DI).
-- **Trí tuệ nhân tạo (Vision & LLM):** Gemini 1.5 Flash (Tối ưu chi phí, thay thế bản PRO/OpenAI trong kế hoạch cũ).
-- **Xử lý Giọng nói (Voice-to-Text):** Faster-Whisper (Chạy Offline, thay thế FPT.AI).
-- **Vector Database:** ChromaDB (Lưu trữ cục bộ, thay thế Pinecone).
-- **AI Orchestrator:** LangGraph (Được chọn để quản lý State và luồng Agent phức tạp thay vì LangChain cơ bản).
+- **LLM văn bản:** Ollama tự host (mặc định `qwen2.5:3b`) qua module `ml_agri_chat` — chạy cục bộ, không phụ thuộc API trả phí.
+- **Phân loại ảnh bệnh:** Mô hình thị giác Keras nội bộ (`vision_model.CoffeeVisionClassifier`).
+- **Vector Database:** ChromaDB (lưu trữ cục bộ, thay thế Pinecone). Lõi RAG hiện dùng embedding hashing nội bộ; kế hoạch nâng cấp sang `sentence-transformers` đa ngôn ngữ.
+- **Bảo mật:** PromptGuard (`prompt_guard.py`), kiểm tra chất lượng ảnh (`clean_img.py`), header `X-Admin-Token` cho mọi endpoint ghi/quản trị.
+
+> **Roadmap (chưa implement, đừng quote như fact):** Faster-Whisper offline cho Voice-to-Text, LangGraph cho orchestrator phức tạp, Gemini Vision API như fallback cloud. Các dependency tương ứng được tháo khỏi `requirements.txt` cho đến khi tích hợp thật.
 
 ---
 

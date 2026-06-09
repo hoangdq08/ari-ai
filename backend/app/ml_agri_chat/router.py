@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from app.ml_agri_chat.modules.clean_img import validate_image_quality
@@ -27,6 +27,12 @@ from app.ml_agri_chat.modules.source_policy import source_review_decision, sourc
 from app.ml_agri_chat.modules.taxonomy import CATEGORY_MAP, classify_query, enrich_metadata_with_taxonomy, is_vague_disease_question, taxonomy_payload
 from app.ml_agri_chat.modules.text_cleaning import clean_text
 from app.ml_agri_chat.modules.vision_model import CoffeeVisionClassifier, VisionPrediction
+from app.shared.rate_limit import (
+    DEFAULT_ADMIN_LIMIT,
+    DEFAULT_CHAT_LIMIT,
+    DEFAULT_IMAGE_LIMIT,
+    limiter,
+)
 from app.shared.upload import max_document_bytes, max_image_bytes, read_upload_capped
 
 
@@ -210,7 +216,8 @@ def _effective_question(question: str, history: list[dict[str, str]]) -> str:
 
 
 @router.post("/chat")
-def chat(payload: ChatRequest) -> dict:
+@limiter.limit(DEFAULT_CHAT_LIMIT)
+def chat(request: Request, payload: ChatRequest) -> dict:
     request_id = str(uuid4())
     log = get_request_logger(request_id)
     conversation_history = _chat_history(payload.history)
@@ -720,7 +727,8 @@ def admin_ops_events(limit: int = 200) -> dict:
 
 
 @router.post("/admin/reset-rag-data", dependencies=[Depends(require_admin_token)])
-def reset_rag_data(payload: ResetDataRequest) -> dict:
+@limiter.limit(DEFAULT_ADMIN_LIMIT)
+def reset_rag_data(request: Request, payload: ResetDataRequest) -> dict:
     for directory in [RAW_DIR, CLEANED_DIR, CHUNKS_DIR, VECTOR_DIR, CRAWL_CANDIDATE_DIR]:
         _clear_directory(directory)
     rag.rebuild([])
@@ -851,8 +859,34 @@ def feedback(payload: FeedbackRequest) -> dict[str, str]:
     return {"status": "received", "request_id": payload.request_id}
 
 
+@router.delete("/sessions/{session_id}")
+def delete_session(session_id: str) -> dict:
+    """Privacy: let users erase their own session footprint from in-memory activity logs.
+
+    Server only keeps `session_id` (opaque to us) plus event metadata (hashes,
+    lengths, source ids). No raw question text is stored, but we still wipe the
+    matching rows so a user can fully clear their trace.
+    """
+    if not session_id or len(session_id) > 128:
+        raise HTTPException(status_code=400, detail="Invalid session_id.")
+    before = len(ACTIVITY_EVENTS)
+    ACTIVITY_EVENTS[:] = [
+        event for event in ACTIVITY_EVENTS if (event.get("payload") or {}).get("session_id") != session_id
+    ]
+    removed = before - len(ACTIVITY_EVENTS)
+    _log_activity(
+        "system",
+        "privacy",
+        "session_deleted",
+        "User session activity erased",
+        {"session_id": session_id, "removed_events": removed},
+    )
+    return {"status": "deleted", "session_id": session_id, "removed_events": removed}
+
+
 @router.post("/diagnose-image")
-async def diagnose_image(file: UploadFile = File(...)) -> dict:
+@limiter.limit(DEFAULT_IMAGE_LIMIT)
+async def diagnose_image(request: Request, file: UploadFile = File(...)) -> dict:
     request_id = str(uuid4())
     log = get_request_logger(request_id)
     image_bytes = await read_upload_capped(file, MAX_IMAGE_BYTES, "Image")
