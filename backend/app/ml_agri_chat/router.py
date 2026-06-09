@@ -866,6 +866,10 @@ def delete_session(session_id: str) -> dict:
     Server only keeps `session_id` (opaque to us) plus event metadata (hashes,
     lengths, source ids). No raw question text is stored, but we still wipe the
     matching rows so a user can fully clear their trace.
+
+    The audit row we leave behind for ops only carries a short hash of the
+    session id (not the id itself) so the deletion itself does not re-pin the
+    session into the activity log.
     """
     if not session_id or len(session_id) > 128:
         raise HTTPException(status_code=400, detail="Invalid session_id.")
@@ -879,7 +883,7 @@ def delete_session(session_id: str) -> dict:
         "privacy",
         "session_deleted",
         "User session activity erased",
-        {"session_id": session_id, "removed_events": removed},
+        {"session_id_hash": _short_hash(session_id), "removed_events": removed},
     )
     return {"status": "deleted", "session_id": session_id, "removed_events": removed}
 
