@@ -1,3 +1,25 @@
+"""Prompt safety helpers used by the chat endpoint.
+
+Scope responsibilities (post-refactor):
+
+- `validate_question`: blocks prompt-injection attempts only. Intent and
+  out-of-scope handling has been moved to
+  `intent_classifier.CascadeIntentClassifier`, which uses both a
+  deterministic layer and an LLM layer for broader coverage. Keeping a
+  separate injection check here matters because it has to fail closed
+  before any LLM (including the classifier) is invoked with hostile
+  input.
+- `basic_chat_response`: short canned answers for greeting / thanks /
+  goodbye / capability prompts. The cascade classifier also handles
+  these, but keeping them here lets non-router callers (tests, future
+  CLIs) re-use the canned text without depending on the LLM client.
+- `validate_advice_text`: post-hoc safety guard for LLM advice output
+  (no hallucinated chemicals / dosages / overpromises).
+
+`DISCLAIMER` is re-exported because both the router and the advisor
+templates embed it in their responses.
+"""
+
 from __future__ import annotations
 
 import re
@@ -11,105 +33,6 @@ INJECTION_PATTERNS = [
     r"ignore (previous|system|developer)",
     r"tiết lộ prompt",
     r"system prompt",
-]
-
-OUT_OF_SCOPE_TERMS = [
-    "bệnh người",
-    "chứng khoán",
-    "vũ khí",
-    "hack",
-    "mật khẩu",
-]
-
-AGRICULTURE_SCOPE_TERMS = [
-    "cà phê",
-    "ca phe",
-    "cafe",
-    "coffee",
-    "nông nghiệp",
-    "nong nghiep",
-    "cây trồng",
-    "cay trong",
-    "cây",
-    "cay",
-    "canh tác",
-    "canh tac",
-    "vườn",
-    "vuon",
-    "trang trại",
-    "trang trai",
-    "năng suất",
-    "nang suat",
-    "giống",
-    "giong",
-    "đất",
-    "dat",
-    "tưới",
-    "tuoi",
-    "phân bón",
-    "phan bon",
-    "sâu bệnh",
-    "sau benh",
-    "bệnh cây",
-    "benh cay",
-    "thu hoạch",
-    "thu hoach",
-    # Phương ngữ / từ địa phương Tây Nguyên, Tây Bắc, Nam Bộ.
-    # Bổ sung để chống bias loại trừ người nói phương ngữ (trục Bias & Fairness).
-    "rẫy",
-    "ray",
-    "đám rẫy",
-    "dam ray",
-    "trỉa",
-    "tria",
-    "sạ",
-    "sa",
-    "ruộng",
-    "ruong",
-    "đồng",
-    "dong",
-    "vụ mùa",
-    "vu mua",
-    "mùa vụ",
-    "mua vu",
-    "lúa",
-    "lua",
-    "hồ tiêu",
-    "ho tieu",
-    "tiêu",
-    "tieu",
-    "điều",
-    "dieu",
-    "sầu riêng",
-    "sau rieng",
-    "bơ",
-    "bo",
-    "ca cao",
-    "cacao",
-    "chè",
-    "che",
-    "mít",
-    "mit",
-    "rau",
-    "trồng",
-    "trong",
-    "bón",
-    "bon",
-    "phun",
-    "phòng trừ",
-    "phong tru",
-]
-
-NON_AGRI_INVESTMENT_TERMS = [
-    "chứng khoán",
-    "chung khoan",
-    "crypto",
-    "coin",
-    "forex",
-    "bất động sản",
-    "bat dong san",
-    "cổ phiếu",
-    "co phieu",
 ]
 
 CHEMICAL_PATTERNS = [
@@ -155,32 +78,27 @@ CAPABILITY_PATTERNS = [
 
 
 def validate_question(question: str) -> tuple[bool, str | None]:
-    normalized = _normalize_text(question)
+    """Block hostile inputs before the cascade classifier runs.
+
+    Returns `(True, None)` for safe inputs. Returns `(False, reason)` only
+    when a prompt-injection pattern is detected. Out-of-scope filtering is
+    delegated to the intent classifier so that we have a single source of
+    truth for what counts as "off topic" and can leverage an LLM-backed
+    fallback for ambiguous cases.
+    """
     lowered = question.lower()
-    compact = re.sub(r"[^\w\s]", " ", normalized)
-    compact = re.sub(r"\s+", " ", compact).strip()
     if any(re.search(pattern, lowered) for pattern in INJECTION_PATTERNS):
         return False, "Không thể xử lý yêu cầu có dấu hiệu prompt injection."
-    if (
-        compact in GREETING_PATTERNS
-        or compact in THANKS_PATTERNS
-        or compact in GOODBYE_PATTERNS
-        or any(pattern in compact for pattern in CAPABILITY_PATTERNS)
-    ):
-        return True, None
-    if any(term in normalized for term in OUT_OF_SCOPE_TERMS):
-        return False, _soft_scope_message()
-    if not any(term in normalized for term in AGRICULTURE_SCOPE_TERMS):
-        return False, _soft_scope_message()
-    if "dau tu" in normalized:
-        is_agriculture_context = any(term in normalized for term in AGRICULTURE_SCOPE_TERMS)
-        is_non_agriculture_investment = any(term in normalized for term in NON_AGRI_INVESTMENT_TERMS)
-        if is_non_agriculture_investment and not is_agriculture_context:
-            return False, _soft_scope_message()
     return True, None
 
 
 def basic_chat_response(question: str) -> dict[str, str] | None:
+    """Canned answer for greetings/thanks/goodbye/capability prompts.
+
+    Kept as a side-channel API for tests and non-router callers. The
+    production chat endpoint uses `CascadeIntentClassifier.canned_response`
+    instead, which delegates to the same intent labels.
+    """
     normalized = _normalize_text(question)
     compact = re.sub(r"[^\w\s]", " ", normalized)
     compact = re.sub(r"\s+", " ", compact).strip()
@@ -214,14 +132,6 @@ def basic_chat_response(question: str) -> dict[str, str] | None:
             "confidence_level": "cao",
         }
     return None
-
-
-def _soft_scope_message() -> str:
-    return (
-        "Mình hiểu ý bạn, nhưng hiện Nông Trí AI được thiết kế để hỗ trợ trong phạm vi nông nghiệp và cây cà phê. "
-        "Nếu bạn muốn, hãy thử hỏi theo hướng vườn cà phê, ví dụ: triệu chứng trên lá/quả/rễ, cách chăm sóc, "
-        "bón phân, tưới nước, giống, thu hoạch hoặc dữ liệu đã crawl trong hệ thống."
-    )
 
 
 def validate_advice_text(text: str) -> list[str]:

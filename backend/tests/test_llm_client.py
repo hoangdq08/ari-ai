@@ -379,3 +379,68 @@ def test_same_primary_and_fallback_skips_fallback(monkeypatch):
     client = mod.LocalLLMClient()
     assert client.provider == "ollama"
     assert client._fallback is None
+
+
+def test_deepseek_passes_response_format_to_api(monkeypatch):
+    """When the caller asks for json_object, we must forward that to DeepSeek."""
+    mod = _reload_module(
+        monkeypatch,
+        {"DEEPSEEK_API_KEY": "sk-x", "NONGTRI_LLM_FALLBACK": ""},
+    )
+
+    captured: dict = {}
+
+    def fake_post(url, headers, json, timeout):
+        captured["json"] = json
+        return _StubResponse(
+            json_payload={"choices": [{"message": {"content": '{"ok": true}'}}]}
+        )
+
+    monkeypatch.setattr(mod.requests, "post", fake_post)
+
+    mod.LocalLLMClient().generate(
+        "ping", temperature=0.0, response_format={"type": "json_object"}
+    )
+    assert captured["json"]["response_format"] == {"type": "json_object"}
+
+
+def test_response_format_omitted_when_not_requested(monkeypatch):
+    mod = _reload_module(
+        monkeypatch,
+        {"DEEPSEEK_API_KEY": "sk-x", "NONGTRI_LLM_FALLBACK": ""},
+    )
+
+    captured: dict = {}
+
+    def fake_post(url, headers, json, timeout):
+        captured["json"] = json
+        return _StubResponse(
+            json_payload={"choices": [{"message": {"content": "ok"}}]}
+        )
+
+    monkeypatch.setattr(mod.requests, "post", fake_post)
+
+    mod.LocalLLMClient().generate("ping")
+    assert "response_format" not in captured["json"]
+
+
+def test_ollama_ignores_response_format(monkeypatch):
+    """Ollama provider must accept the kwarg without crashing or forwarding."""
+    mod = _reload_module(
+        monkeypatch,
+        {"NONGTRI_LLM_PROVIDER": "ollama", "NONGTRI_LLM_FALLBACK": ""},
+    )
+
+    captured: dict = {}
+
+    def fake_post(url, json, timeout):
+        captured["json"] = json
+        return _StubResponse(json_payload={"response": "ok"})
+
+    monkeypatch.setattr(mod.requests, "post", fake_post)
+
+    result = mod.LocalLLMClient().generate(
+        "ping", response_format={"type": "json_object"}
+    )
+    assert result.used_fallback is False
+    assert "response_format" not in captured["json"]

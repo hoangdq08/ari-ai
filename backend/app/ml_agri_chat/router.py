@@ -738,6 +738,18 @@ def admin_ops_events(limit: int = 200) -> dict:
     }
 
 
+@router.get("/admin/intent-metrics", dependencies=[Depends(require_admin_token)])
+def admin_intent_metrics() -> dict:
+    """Aggregated counters from the cascade intent classifier.
+
+    Per-process counters since worker start; with multi-worker deployments
+    scrape each worker (e.g. behind a load balancer with sticky session).
+    Use this to tune `l1_confidence_threshold` and decide whether the
+    deterministic layer covers enough traffic.
+    """
+    return {"intent_classifier": intent_classifier.stats()}
+
+
 @router.post("/admin/reset-rag-data", dependencies=[Depends(require_admin_token)])
 @limiter.limit(DEFAULT_ADMIN_LIMIT)
 def reset_rag_data(request: Request, payload: ResetDataRequest) -> dict:

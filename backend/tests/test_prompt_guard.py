@@ -56,11 +56,26 @@ def test_validate_question_blocks_injection():
     assert "injection" in (reason or "").lower()
 
 
-def test_validate_question_blocks_out_of_scope():
+def test_validate_question_passes_out_of_scope_through_to_classifier():
+    """Post-refactor: OOS filtering moved to CascadeIntentClassifier. The
+    legacy keyword block is gone so OOS inputs reach the classifier where
+    they get a proper soft-reject (see tests/test_intent_classifier.py)."""
     allowed, reason = validate_question("đánh giá cổ phiếu công ty A")
-    assert allowed is False
+    assert allowed is True
+    assert reason is None
 
 
 def test_validate_question_allows_agriculture():
     allowed, _ = validate_question("phòng trừ rỉ sắt lá cà phê")
     assert allowed is True
+
+
+def test_validate_question_allows_dialect_terms():
+    """Bias & Fairness: dialect words pass the injection check."""
+    for q in [
+        "Đám rẫy cà phê nhà tôi bị vàng lá",
+        "Trên rẫy tiêu có sâu",
+        "Lúa trỉa giống mới ở Tây Nguyên",
+    ]:
+        allowed, reason = validate_question(q)
+        assert allowed, f"Dialect rejected: {q!r} -> {reason}"

@@ -119,7 +119,7 @@ class _StubLLM:
     def is_enabled(self) -> bool:
         return self._enabled
 
-    def generate(self, prompt: str, *, temperature: float = 0.1, timeout_override=None) -> LLMResult:
+    def generate(self, prompt: str, *, temperature: float = 0.1, timeout_override=None, response_format=None) -> LLMResult:
         return LLMResult(
             text=self._text,
             provider="deepseek",
@@ -269,3 +269,45 @@ def test_cascade_canned_response_shapes():
     assert CascadeIntentClassifier.canned_response("social_chitchat")["confidence_level"] == "cao"
     assert CascadeIntentClassifier.canned_response("out_of_scope")["confidence_level"] == "thap"
     assert CascadeIntentClassifier.canned_response("agri_question") is None
+
+
+# ---------------- Metrics ----------------
+
+
+def test_stats_counts_by_source_and_label():
+    """Classifier exposes counters per layer source + per intent label."""
+    cascade = CascadeIntentClassifier(
+        _StubLLM(text='{"intent": "out_of_scope", "confidence": 0.95}'),
+        l1_confidence_threshold=0.7,
+    )
+
+    # L1 paths
+    cascade.classify("xin chào")          # greeting via l1_deterministic
+    cascade.classify("trồng cà phê")      # agri via l1_deterministic
+    cascade.classify("tối đi cà phê không")  # social via l1_deterministic
+    # L2 path (crop only -> weak L1 -> escalates)
+    cascade.classify("cà phê")
+    # Cache hit
+    cascade.classify("xin chào")
+
+    stats = cascade.stats()
+    assert stats["total"] == 5
+    by_source = stats["by_source"]
+    by_label = stats["by_label"]
+
+    # 2x deterministic greeting/agri/social already covered. The
+    # repeated "xin chào" is a L1 cache hit.
+    assert by_source["l1_deterministic"] == 3
+    assert by_source["l1_cache"] == 1
+    assert by_source["l2_llm"] == 1
+
+    assert by_label["greeting"] == 2  # original + cached
+    assert by_label["agri_question"] == 1
+    assert by_label["social_chitchat"] == 1
+    assert by_label["out_of_scope"] == 1
+
+
+def test_stats_starts_empty():
+    cascade = CascadeIntentClassifier(_StubLLM(text=""))
+    stats = cascade.stats()
+    assert stats == {"by_source": {}, "by_label": {}, "total": 0}

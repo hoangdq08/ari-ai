@@ -65,7 +65,14 @@ class _Provider(ABC):
     model: str
 
     @abstractmethod
-    def generate(self, prompt: str, *, temperature: float, timeout_override: float | None = None) -> LLMResult: ...
+    def generate(
+        self,
+        prompt: str,
+        *,
+        temperature: float,
+        timeout_override: float | None = None,
+        response_format: dict[str, Any] | None = None,
+    ) -> LLMResult: ...
 
     @abstractmethod
     def status(self) -> dict[str, Any]: ...
@@ -90,7 +97,14 @@ class _DisabledProvider(_Provider):
     def is_configured(self) -> bool:
         return False
 
-    def generate(self, prompt: str, *, temperature: float, timeout_override: float | None = None) -> LLMResult:
+    def generate(
+        self,
+        prompt: str,
+        *,
+        temperature: float,
+        timeout_override: float | None = None,
+        response_format: dict[str, Any] | None = None,
+    ) -> LLMResult:
         return LLMResult(
             text="",
             provider=self.name,
@@ -119,7 +133,17 @@ class _OllamaProvider(_Provider):
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
 
-    def generate(self, prompt: str, *, temperature: float, timeout_override: float | None = None) -> LLMResult:
+    def generate(
+        self,
+        prompt: str,
+        *,
+        temperature: float,
+        timeout_override: float | None = None,
+        response_format: dict[str, Any] | None = None,
+    ) -> LLMResult:
+        # Ollama does not advertise OpenAI-compatible response_format on the
+        # /api/generate endpoint; the kwarg is accepted but ignored so the
+        # facade signature stays uniform across providers.
         try:
             response = requests.post(
                 f"{self.base_url}/api/generate",
@@ -194,7 +218,14 @@ class _DeepSeekProvider(_Provider):
             "Content-Type": "application/json",
         }
 
-    def generate(self, prompt: str, *, temperature: float, timeout_override: float | None = None) -> LLMResult:
+    def generate(
+        self,
+        prompt: str,
+        *,
+        temperature: float,
+        timeout_override: float | None = None,
+        response_format: dict[str, Any] | None = None,
+    ) -> LLMResult:
         if not self._api_key:
             return LLMResult(
                 text="",
@@ -203,17 +234,23 @@ class _DeepSeekProvider(_Provider):
                 used_fallback=True,
                 error="DEEPSEEK_API_KEY is not set.",
             )
+        body: dict[str, Any] = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "max_tokens": 700,
+            "stream": False,
+        }
+        if response_format is not None:
+            # OpenAI-compatible: {"type": "json_object"} forces the model
+            # to emit a single valid JSON object. Verified against
+            # https://api-docs.deepseek.com (chat/completions schema).
+            body["response_format"] = response_format
         try:
             response = requests.post(
                 f"{self.base_url}/chat/completions",
                 headers=self._headers(),
-                json={
-                    "model": self.model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": temperature,
-                    "max_tokens": 700,
-                    "stream": False,
-                },
+                json=body,
                 timeout=timeout_override if timeout_override is not None else self.timeout_seconds,
             )
             response.raise_for_status()
@@ -387,9 +424,19 @@ class LocalLLMClient:
     def is_enabled(self) -> bool:
         return self.enabled
 
-    def generate(self, prompt: str, *, temperature: float = 0.1, timeout_override: float | None = None) -> LLMResult:
+    def generate(
+        self,
+        prompt: str,
+        *,
+        temperature: float = 0.1,
+        timeout_override: float | None = None,
+        response_format: dict[str, Any] | None = None,
+    ) -> LLMResult:
         result = self._primary.generate(
-            prompt, temperature=temperature, timeout_override=timeout_override
+            prompt,
+            temperature=temperature,
+            timeout_override=timeout_override,
+            response_format=response_format,
         )
         if not result.used_fallback or self._fallback is None:
             self.last_call_provider = result.provider
@@ -399,7 +446,10 @@ class LocalLLMClient:
         # Primary failed at runtime. Try fallback.
         primary_error = result.error or "unknown error"
         fallback_result = self._fallback.generate(
-            prompt, temperature=temperature, timeout_override=timeout_override
+            prompt,
+            temperature=temperature,
+            timeout_override=timeout_override,
+            response_format=response_format,
         )
         if fallback_result.used_fallback:
             # Both failed. Report aggregated error; keep primary-shaped

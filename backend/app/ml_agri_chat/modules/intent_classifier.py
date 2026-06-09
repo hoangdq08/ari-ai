@@ -21,7 +21,7 @@ import json
 import re
 import threading
 import unicodedata
-from collections import OrderedDict
+from collections import Counter, OrderedDict
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -323,7 +323,13 @@ class _LLMIntentClassifier:
 
         prompt = _LLM_PROMPT_TEMPLATE.format(question=question[:500])
         result = self._llm.generate(
-            prompt, temperature=0.0, timeout_override=self._timeout
+            prompt,
+            temperature=0.0,
+            timeout_override=self._timeout,
+            # OpenAI-compatible providers (e.g. DeepSeek) will honour this
+            # and emit a single JSON object. Providers that ignore it (e.g.
+            # Ollama on /api/generate) still receive the prompt verbatim.
+            response_format={"type": "json_object"},
         )
         if result.used_fallback or not result.text:
             return IntentResult(
@@ -435,16 +441,27 @@ class CascadeIntentClassifier:
         )
         self._threshold = l1_confidence_threshold
         self._cache = _LRUCache(cache_capacity)
+        # Per-process counters: {source -> count} and {label -> count}.
+        # `Counter` increments are not atomic across threads, but at worst
+        # we under-count by a handful of events; the metric is informational
+        # so we trade strict correctness for zero locking overhead in the
+        # hot path. Documented in the admin endpoint description.
+        self._source_counts: Counter[str] = Counter()
+        self._label_counts: Counter[str] = Counter()
 
     def classify(self, question: str) -> IntentResult:
         cache_key = _compact(_normalize(question))
         if not cache_key:
-            return IntentResult("greeting", 0.95, "l1_deterministic", "empty_input")
+            result = IntentResult(
+                "greeting", 0.95, "l1_deterministic", "empty_input"
+            )
+            self._record(result)
+            return result
 
         cached = self._cache.get(cache_key)
         if cached is not None:
             # Preserve source info but mark as cache hit so logs are obvious.
-            return IntentResult(
+            cached_result = IntentResult(
                 cached.label,
                 cached.confidence,
                 cached.source.replace("l2_llm", "l2_cache").replace(
@@ -452,10 +469,13 @@ class CascadeIntentClassifier:
                 ),
                 cached.reason,
             )
+            self._record(cached_result)
+            return cached_result
 
         result = self._l1.classify(question)
         if result.confidence >= self._threshold:
             self._cache.put(cache_key, result)
+            self._record(result)
             return result
 
         # Ambiguous or unknown - escalate.
@@ -463,7 +483,22 @@ class CascadeIntentClassifier:
         if l2_result.source == "l2_llm":
             # Only cache trusted L2 outcomes.
             self._cache.put(cache_key, l2_result)
+        self._record(l2_result)
         return l2_result
+
+    def _record(self, result: IntentResult) -> None:
+        self._source_counts[result.source] += 1
+        self._label_counts[result.label] += 1
+
+    def stats(self) -> dict[str, Any]:
+        """Returns counters since process start. Per-process; under
+        multi-worker deployments aggregate at the load balancer or scrape
+        each worker individually."""
+        return {
+            "by_source": dict(self._source_counts),
+            "by_label": dict(self._label_counts),
+            "total": sum(self._source_counts.values()),
+        }
 
     @staticmethod
     def canned_response(intent: Intent) -> dict[str, Any] | None:
