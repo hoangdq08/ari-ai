@@ -218,6 +218,31 @@ def chat(request: Request, payload: ChatRequest) -> dict:
             "safety_disclaimer": DISCLAIMER,
         }
 
+    try:
+        return _chat_core(request_id, log, payload, conversation_history, effective_question)
+    except Exception:
+        log.exception("chat_error request_id=%s", request_id)
+        _log_activity(request_id, "chat", "error", "Unhandled exception in chat pipeline", {})
+        return {
+            "answer": (
+                "Hệ thống gặp lỗi khi xử lý câu hỏi. "
+                "Vui lòng thử lại sau hoặc đặt câu hỏi khác."
+            ),
+            "sources": [],
+            "confidence_level": "thap",
+            "safety_disclaimer": DISCLAIMER,
+            "error": True,
+        }
+
+
+def _chat_core(
+    request_id: str,
+    log,
+    payload: ChatRequest,
+    conversation_history: list[dict[str, str]],
+    effective_question: str,
+) -> dict:
+    """Core chat logic, separated so the caller can wrap it in try/except."""
     with StageTimer("intent") as t_intent:
         intent_result = intent_classifier.classify(
             payload.question, history=conversation_history
@@ -297,7 +322,43 @@ def chat(request: Request, payload: ChatRequest) -> dict:
             "advisor_ms": round(t_advisor.elapsed_ms, 1),
         },
     )
-    return {**answer, "routing": route, "session_id": payload.session_id}
+
+    # --- Trục 3: Reasoning trace (Explainability) ---
+    reasoning_trace = {
+        "intent": {
+            "label": intent_result.label,
+            "confidence": round(intent_result.confidence, 2),
+            "source": intent_result.source,
+        },
+        "routing": route,
+        "retrieval": {
+            "effective_question_hash": _short_hash(effective_question),
+            "top_k_requested": payload.top_k,
+            "chunks_returned": len(chunks),
+            "top_scores": [
+                {"source_id": c["metadata"]["source_id"], "score": c.get("score"), "score_breakdown": c.get("score_breakdown")}
+                for c in chunks[:3]
+            ],
+        },
+        "advisor": {
+            "confidence_level": answer.get("confidence_level"),
+            "llm": answer.get("llm"),
+        },
+        "timing_ms": {
+            "intent": round(t_intent.elapsed_ms, 1),
+            "retrieval": round(t_retrieval.elapsed_ms, 1),
+            "advisor": round(t_advisor.elapsed_ms, 1),
+        },
+    }
+
+    result = {
+        **answer,
+        "routing": route,
+        "session_id": payload.session_id,
+        "reasoning_trace": reasoning_trace,
+        "embedding_degraded": rag.store.is_degraded,
+    }
+    return result
 
 
 @router.post("/ingest-document", dependencies=[Depends(require_admin_token)])
@@ -1004,7 +1065,18 @@ async def diagnose_image(request: Request, file: UploadFile = File(...)) -> dict
         },
     )
 
-    return {
+    # --- Trục 2+3: Vision model type notice ---
+    # Indicate whether the real Keras model or the pixel-heuristic placeholder
+    # was used, so the frontend/user knows the reliability of the diagnosis.
+    is_placeholder = classifier.model is None
+    vision_model_notice = None
+    if is_placeholder:
+        vision_model_notice = (
+            "Vision model thật chưa được tải (model file không tồn tại hoặc lỗi). "
+            "Kết quả chẩn đoán dựa trên heuristic pixel đơn giản, độ tin cậy thấp hơn đáng kể."
+        )
+
+    result = {
         "request_id": request_id,
         "image_quality": {"passed": quality.passed, "issues": quality.issues},
         "prediction": {
@@ -1013,4 +1085,8 @@ async def diagnose_image(request: Request, file: UploadFile = File(...)) -> dict
             "observed_symptoms": prediction.observed_symptoms,
         },
         "rag_advice": rag_advice,
+        "vision_model_type": "placeholder" if is_placeholder else "keras",
     }
+    if vision_model_notice:
+        result["vision_model_notice"] = vision_model_notice
+    return result

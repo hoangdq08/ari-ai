@@ -206,6 +206,7 @@ class _CascadeEmbeddingProvider(_EmbeddingProvider):
         # migration based on the active embedding space.
         self.name = primary.name
         self.version = primary.version
+        self.degraded = False  # True when fallback was promoted at boot
 
     def is_available(self) -> bool:
         return self._primary.is_available() or (
@@ -240,7 +241,9 @@ def _resolve_provider() -> _EmbeddingProvider:
     # (e.g. Ollama daemon not running). Avoids burning a network round-trip
     # on every embed call only to fall back.
     if not primary.is_available() and fallback is not None and fallback.is_available():
-        return _CascadeEmbeddingProvider(fallback, None)
+        cascade = _CascadeEmbeddingProvider(fallback, None)
+        cascade.degraded = True
+        return cascade
 
     return _CascadeEmbeddingProvider(primary, fallback)
 
@@ -263,6 +266,12 @@ class EmbeddingStore:
     @property
     def embedding_version(self) -> str:
         return self._provider.version
+
+    @property
+    def is_degraded(self) -> bool:
+        """True when the primary embedding provider was unavailable at boot
+        and the system fell back to a lower-quality provider (e.g. hashing)."""
+        return getattr(self._provider, "degraded", False)
 
     def add_chunks(self, chunks: list[dict[str, Any]]) -> int:
         incoming_source_ids = {
@@ -319,19 +328,28 @@ class EmbeddingStore:
             title_text = _fold_vietnamese(str(metadata.get("title") or "").lower())
             reliability_level = infer_reliability(metadata.get("url"), metadata.get("reliability_level", "internet"))
             penalty = source_penalty(metadata.get("title"), metadata.get("url"), chunk.get("text", ""))
-            score = (
-                _vector_similarity(query_embedding, chunk.get("embedding"))
-                + _keyword_boost(query_tokens, query_phrases, chunk_text)
-                + _title_boost(query_tokens, query_phrases, title_text)
-                + _domain_phrase_boost(query_tokens, f"{title_text} {chunk_text}")
-                + RELIABILITY_BOOST.get(reliability_level, 0.0)
-                - penalty
-            )
+
+            # Compute individual score components for Trục 3 (Explainability)
+            s_vector = _vector_similarity(query_embedding, chunk.get("embedding"))
+            s_keyword = _keyword_boost(query_tokens, query_phrases, chunk_text)
+            s_title = _title_boost(query_tokens, query_phrases, title_text)
+            s_domain = _domain_phrase_boost(query_tokens, f"{title_text} {chunk_text}")
+            s_reliability = RELIABILITY_BOOST.get(reliability_level, 0.0)
+            score = s_vector + s_keyword + s_title + s_domain + s_reliability - penalty
+
             if score > 0.02:
                 payload = {k: v for k, v in chunk.items() if k != "embedding"}
                 payload.setdefault("metadata", {})
                 payload["metadata"]["reliability_level"] = reliability_level
                 payload["score"] = round(score, 4)
+                payload["score_breakdown"] = {
+                    "vector": round(s_vector, 4),
+                    "keyword": round(s_keyword, 4),
+                    "title": round(s_title, 4),
+                    "domain_phrase": round(s_domain, 4),
+                    "reliability": round(s_reliability, 4),
+                    "penalty": round(penalty, 4),
+                }
                 results.append(payload)
         ranked = sorted(results, key=lambda item: item["score"], reverse=True)
         deduped = []

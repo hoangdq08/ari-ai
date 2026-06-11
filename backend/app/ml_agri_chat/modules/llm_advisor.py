@@ -35,6 +35,14 @@ LOW_VALUE_LINE_PATTERNS = [
         r"^\s*stt\b",
         r"^\s*toggle\b",
         r"^\s*menu\b",
+        # --- TOC, author/affiliation, page-number noise from PDF extraction ---
+        r"\.{4,}",                                     # dotted leaders: "Chương 1.......15"
+        r"^\s*\d+\.\d+\.\d*\s",                        # section numbers: "1.4.1. Yêu cầu"
+        r"^\s*(ThS|TS|PGS|GS|CN|KS)\.\s",             # academic titles at line start
+        r"^\s*\d+\s*[-–.]\s*(ThS|TS|PGS|GS|CN|KS)\b", # numbered author: "4. ThS. Hoàng..."
+        r"[-–]\s*(GIZ|WASI|IPSARD|FAO|UNDP|JICA)\b",  # org affiliations
+        r"(Viện trưởng|Phó Viện trưởng|Nguyên Phó Viện trưởng)\s+(WASI|IPSARD|VAAS)\b",  # title+org
+        r"^\s*trang\s+\d+",                            # "Trang 15"
     ]
 ]
 
@@ -215,7 +223,13 @@ def _summarize_context(context: str, question: str) -> str:
             return "\n".join(f"- {item}" for item in checklist)
 
     sentences = [_clean_summary_sentence(part) for part in re.split(r"[.\n]", context)]
-    sentences = [part for part in sentences if 35 <= len(part) <= 260]
+    sentences = [
+        part for part in sentences
+        if 35 <= len(part) <= 260
+        and not any(pattern.search(part) for pattern in LOW_VALUE_LINE_PATTERNS)
+        and not _is_ocr_garbage(part)
+        and not part.lstrip().startswith(",")
+    ]
     if not sentences:
         return ""
     important_tokens = {
@@ -290,7 +304,31 @@ def _format_history(history: list[dict[str, str]]) -> str:
     return "\n".join(lines) if lines else "Không có lịch sử hội thoại trước đó."
 
 
+_INJECTION_PATTERNS = [
+    re.compile(r"(ignore|disregard|forget)\s+(previous|all|system|above|prior)\s+(instructions?|rules?|prompt)", re.IGNORECASE),
+    re.compile(r"(you are now|act as|pretend to be|switch to|new role)\b", re.IGNORECASE),
+    re.compile(r"(bỏ qua|phớt lờ|quên)\s+(hướng dẫn|quy tắc|system|prompt)", re.IGNORECASE),
+    re.compile(r"(repeat|translate|reveal|show|print)\s+(the|your|system|above)\s+(prompt|instructions?|text)", re.IGNORECASE),
+    re.compile(r"```\s*(system|prompt|instruction)", re.IGNORECASE),
+]
+
+
+def _sanitize_rag_context(context: str) -> str:
+    """Strip instruction-like patterns from crawled content before LLM injection.
+
+    Source documents (especially web-crawled) may contain adversarial or
+    accidental instruction fragments that could hijack the LLM's behavior.
+    We strip common prompt-injection patterns so the model treats the
+    context as pure reference material.
+    """
+    sanitized = context
+    for pattern in _INJECTION_PATTERNS:
+        sanitized = pattern.sub("[đã lọc]", sanitized)
+    return sanitized
+
+
 def _chat_prompt(question: str, context: str, conversation_context: str = "", effective_question: str | None = None) -> str:
+    context = _sanitize_rag_context(context)
     return f"""Bạn là trợ lý RAG nông nghiệp tiếng Việt cho cây cà phê.
 
 QUY TẮC BẮT BUỘC:
@@ -337,9 +375,25 @@ def _fallback_chat_answer(context: str, question: str) -> str:
     summary = _summarize_context(context, question)
     if not summary:
         return "Hiện chưa có đủ tài liệu trong hệ thống để kết luận."
+
+    # Filter out obviously incomplete/fragmented bullets (trailing numbers,
+    # starting with lowercase after bullet, very short after strip)
+    clean_lines = []
+    for line in summary.splitlines():
+        stripped = line.lstrip("- ").rstrip(".")
+        # Skip lines that are just section numbers or fragments
+        if re.match(r"^[\d\s.]+$", stripped):
+            continue
+        if len(stripped) < 30:
+            continue
+        clean_lines.append(line)
+
+    if not clean_lines:
+        return "Hiện chưa có đủ tài liệu trong hệ thống để kết luận."
+
     return (
         "Dựa trên tài liệu đã truy xuất, có thể tham khảo:\n"
-        f"{summary}\n"
+        f"{chr(10).join(clean_lines)}\n"
         "Hệ thống chưa tự suy ra loại phân, liều lượng hoặc lịch bón ngoài phần tài liệu đã nêu. "
         "Nên đối chiếu với tình trạng vườn và hỏi cán bộ khuyến nông nếu cần quyết định kỹ thuật cụ thể."
     )
@@ -618,17 +672,21 @@ def _sanitize_context_text(text: str) -> str:
             continue
         if any(pattern.search(line) for pattern in LOW_VALUE_LINE_PATTERNS):
             continue
+        if _is_ocr_garbage(line):
+            continue
         lines.append(line)
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
 def _fix_ocr_spacing(text: str) -> str:
-    fixed = text
-    fixed = re.sub(r"(\w)\s+([ƣơăâêôơưđ])", r"\1\2", fixed, flags=re.IGNORECASE)
-    fixed = re.sub(r"([ƣơăâêôơưđ])\s+(\w)", r"\1\2", fixed, flags=re.IGNORECASE)
-    fixed = re.sub(r"(\b\w)\s+(\w\b)", r"\1\2", fixed)
-    fixed = re.sub(r"\s{2,}", " ", fixed)
-    return fixed
+    """Collapse multi-space runs left over from OCR/PDF extraction.
+
+    The previous implementation tried to merge Vietnamese diacritic characters
+    across whitespace (e.g. ``ă`` separated from its word), but the regex
+    was too aggressive and destroyed valid word boundaries. We now only
+    collapse runs of 2+ spaces to a single space, which is safe.
+    """
+    return re.sub(r"[ \t]{2,}", " ", text)
 
 
 def _is_pre_harvest_question(normalized_question: str) -> bool:
@@ -655,6 +713,39 @@ def _build_pre_harvest_checklist(context: str) -> list[str]:
 
 def _looks_like_training_noise(normalized_text: str) -> bool:
     return any(pattern.search(normalized_text) for pattern in TRAINING_NOISE_PATTERNS)
+
+
+# Regex for detecting OCR-broken Vietnamese: consonant + space + accented vowel
+# followed by consonant - catches "ho ạt", "l ực" but not "n đối" (valid word boundary)
+_OCR_BROKEN_RE = re.compile(
+    r"[bcdfghjklmnpqrstvwxyz]\s[ạảãáàắằẳẵặấầẩẫậếềểễệíìỉĩịốồổỗộớờởỡợứừửữự][bcdfghjklmnpqrstvwxyz]",
+    re.IGNORECASE,
+)
+# Old Vietnamese chars from OCR (ƣ = ư)
+_OLD_VN_CHAR_RE = re.compile(r"[ƣƢ]")
+# Mixed-case OCR garbage: lowercase-UPPER-lowercase inside a word
+_MIXED_CASE_RE = re.compile(r"[a-zàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệ][A-ZÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÈÉẺẼẸ]{2,}")
+
+
+def _is_ocr_garbage(text: str) -> bool:
+    """Return True if text has heavy OCR broken-spacing damage.
+
+    Light damage (1-2 hits in a long sentence) is tolerable; we only reject
+    when the density is high enough that the sentence is unreadable.
+    """
+    # Old Vietnamese chars (ƣ) = almost certainly OCR from scan
+    if _OLD_VN_CHAR_RE.search(text):
+        return True
+    # Mixed case garbage ("cHU ẩn củ A")
+    if _MIXED_CASE_RE.search(text):
+        return True
+    hits = len(_OCR_BROKEN_RE.findall(text))
+    if hits == 0:
+        return False
+    # Any hit in a short sentence = garbage; longer text tolerates 1-2
+    if len(text) < 120:
+        return hits >= 1
+    return hits >= 3 or (hits / max(1, len(text))) > 0.010
 
 
 def _is_low_value_chunk_for_question(normalized_question: str, normalized_text: str) -> bool:

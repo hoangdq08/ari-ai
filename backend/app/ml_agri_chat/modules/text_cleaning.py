@@ -33,6 +33,14 @@ DROP_LINE_PATTERNS = [
     re.compile(r"^email:", re.IGNORECASE),
     re.compile(r"^website:", re.IGNORECASE),
     re.compile(r"^địa chỉ:", re.IGNORECASE),
+    # --- PDF front-matter / TOC / author-list noise ---
+    re.compile(r"\.{4,}"),                                        # TOC dotted leaders
+    re.compile(r"^\d+\.\d+\.\d*\s"),                              # section numbers "1.4.1. Yêu cầu"
+    re.compile(r"^(ThS|TS|PGS|GS|CN|KS)\.\s", re.IGNORECASE),    # academic title at start
+    re.compile(r"^\d+\s*[-–.]\s*(ThS|TS|PGS|GS|CN|KS)\b", re.IGNORECASE),  # "4. ThS. Hoàng..."
+    re.compile(r"[-–]\s*(GIZ|WASI|IPSARD|FAO|UNDP|JICA)\b"),     # org affiliation
+    re.compile(r"(Viện trưởng|Phó Viện trưởng)\s+(WASI|IPSARD|VAAS|NOMAFSI)\b", re.IGNORECASE),
+    re.compile(r"^trang\s+\d+", re.IGNORECASE),                   # "Trang 15"
 ]
 
 

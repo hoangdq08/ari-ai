@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -54,14 +55,26 @@ BAD_ENCODING_RE = re.compile(r"(Ã|Æ|áº|á»|Ä|Â)")
 SOCIAL_HOST_TOKENS = ("facebook.com", "youtube.com", "youtu.be", "tiktok.com")
 REGISTRY_PATH = Path(__file__).resolve().parents[1] / "ml_pipeline" / "crawler" / "source_registry.json"
 
+# --- Cached registry loader (TTL = 60s) ---
+_registry_cache: dict[str, Any] = {}
+_registry_cache_time: float = 0.0
+_REGISTRY_CACHE_TTL = 60.0
+
 
 def load_source_registry() -> dict[str, Any]:
+    global _registry_cache, _registry_cache_time
+    now = time.monotonic()
+    if _registry_cache and (now - _registry_cache_time) < _REGISTRY_CACHE_TTL:
+        return _registry_cache
     try:
         with REGISTRY_PATH.open("r", encoding="utf-8") as handle:
             payload = json.load(handle)
-        return payload if isinstance(payload, dict) else {}
+        result = payload if isinstance(payload, dict) else {}
     except (OSError, json.JSONDecodeError):
-        return {}
+        result = {}
+    _registry_cache = result
+    _registry_cache_time = now
+    return result
 
 
 def trusted_domains(level: str) -> tuple[str, ...]:
