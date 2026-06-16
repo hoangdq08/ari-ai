@@ -24,3 +24,6 @@ data/chromadb/
 # OS Files
 .DS_Store
 Thumbs.db
+
+# asdf
+.tool-versions
