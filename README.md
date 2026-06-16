@@ -103,23 +103,30 @@ Toàn bộ mã nguồn dự án được đặt trong thư mục gốc `ArgiAI/`
 
 ```text
 ArgiAI/
-├── docs/                 # 📚 Tài liệu, thiết kế và kế hoạch dự án
-├── frontend/             # 📱 Giao diện Web App (Kiến trúc DDD + Clean Architecture)
+├── data/                 # 🗄️ Dữ liệu hệ thống (Vector DB ChromaDB, local development)
+├── docs/                 # 📚 Tài liệu, thiết kế, luồng dữ liệu và kế hoạch
+├── plan/                 # 🗓️ Thư mục chứa các bản kế hoạch chi tiết
+├── frontend/             # 📱 Giao diện Web App (Next.js + Kiến trúc DDD)
 │   └── src/
+│       ├── app/          # Next.js App Router (Pages, Layouts)
 │       ├── core/         # Lõi hệ thống (Cấu hình, HTTP client)
-│       └── modules/      # Các Domain nghiệp vụ (chat, diagnostics, handbook)
+│       ├── lib/          # Tiện ích dùng chung (Utils, hooks)
+│       ├── modules/      # Các Domain nghiệp vụ (chat, diagnostics, handbook)
+│       └── shared/       # UI Components dùng chung
 ├── admin/                # 🛠️ Giao diện quản trị dữ liệu/RAG/ops (Vite + React)
 │
 ├── backend/              # ⚙️ Hệ thống API Server (FastAPI + Clean Architecture)
 │   ├── app/
 │   │   ├── core/         # Lõi hệ thống (Config env, Dependency Injection)
+│   │   ├── ml_agri_chat/ # Runtime ML-Agri-Chat tích hợp cho admin/RAG/crawl/ops
 │   │   ├── modules/      # Các Domain nghiệp vụ (chat, diagnostics, handbook)
-│   │   │   └── domain/   # Chứa trực tiếp entities.py và interfaces.py
-│   │   └── ml_agri_chat/ # Runtime ML-Agri-Chat tích hợp cho admin/RAG/crawl/ops
+│   │   ├── services/     # Các Service dùng chung (LLM, Vision, v.v.)
+│   │   └── shared/       # Tiện ích dùng chung của backend
 │   └── requirements.txt  # Thư viện Python
 │
-├── docker-compose.yml    # File cấu hình chạy toàn bộ hệ thống
+├── docker-compose.yml    # File cấu hình chạy toàn bộ hệ thống (Docker)
 ├── .env.example          # Mẫu cấu hình biến môi trường toàn hệ thống
+├── start.sh              # 🚀 Script khởi chạy dự án tiện lợi
 ├── TODO.md               # 📝 Danh sách các công việc còn lại (Lộ trình)
 └── README.md             # 📍 Tài liệu tổng quan dự án
 ```
