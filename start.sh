@@ -119,13 +119,13 @@ start_local() {
   ADMIN_PORT="${ADMIN_PORT:-8082}"
 
   start_process "backend on http://localhost:$BACKEND_PORT" \
-    bash -lc "cd '$BACKEND_DIR' && source .venv/bin/activate && uvicorn app.main:app --host 127.0.0.1 --port '$BACKEND_PORT'"
+    bash -c "cd '$BACKEND_DIR' && source .venv/bin/activate && exec uvicorn app.main:app --host 127.0.0.1 --port '$BACKEND_PORT'"
 
   start_process "frontend on http://localhost:$FRONTEND_PORT" \
-    bash -lc "cd '$FRONTEND_DIR' && npm run dev"
+    bash -c "cd '$FRONTEND_DIR' && exec npm run dev"
 
   start_process "admin on http://localhost:$ADMIN_PORT" \
-    bash -lc "cd '$ADMIN_DIR' && npm run dev"
+    bash -c "cd '$ADMIN_DIR' && exec npm run dev"
 
   log "All services are starting"
   printf 'Frontend: http://localhost:%s\n' "$FRONTEND_PORT"

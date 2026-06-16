@@ -58,6 +58,7 @@ _DEFAULT_FALLBACK = "ollama"
 # 35s when the cloud call is stuck.
 _DEFAULT_PRIMARY_TIMEOUT = 15.0
 _DEFAULT_FALLBACK_TIMEOUT = 35.0
+_DEFAULT_TEMPERATURE = float(os.getenv("NONGTRI_LLM_TEMPERATURE", "0.1"))
 
 
 @dataclass
@@ -468,7 +469,7 @@ class LocalLLMClient:
         self,
         prompt: str,
         *,
-        temperature: float = 0.1,
+        temperature: float = _DEFAULT_TEMPERATURE,
         timeout_override: float | None = None,
         response_format: dict[str, Any] | None = None,
     ) -> LLMResult:
