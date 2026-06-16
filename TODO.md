@@ -24,10 +24,12 @@ Tài liệu này liệt kê các hạng mục công việc (TODO) còn lại sau
 - [x] **🤖 Lõi Điều Phối (AI Orchestrator & Memory):**
   - [x] **AI Router (LangChain/LangGraph):** Xây dựng bộ não điều phối trung tâm. Tự động phân loại luồng yêu cầu: Nếu người dùng gửi ảnh -> Gọi luồng *Chẩn đoán (Vision)*; Nếu người dùng hỏi chữ/giọng nói -> Gọi luồng *Hỏi đáp (RAG)*.
   - [x] **Conversation Memory:** Thiết lập bộ nhớ lưu trữ ngữ cảnh hội thoại (Redis hoặc SQLite) để AI nhớ được câu hỏi trước đó của nông dân, tạo cảm giác giao tiếp tự nhiên.
+  - [ ] **Tối ưu Conversation Memory:** Chuyển hoàn toàn việc lưu trữ lịch sử hội thoại xuống Backend DB (Redis/SQLite) thay vì truyền đi truyền lại qua request từ Frontend, giúp tiết kiệm băng thông 3G/4G cho nông dân.
 
 - [x] **🛡️ Trục 1: Robustness (Bền bỉ / Chống lỗi)**
   - [x] **CleanImg:** Xây dựng module đánh giá ảnh đầu vào. Tự động từ chối ảnh mờ, rung tay, sai góc độ và yêu cầu nông dân chụp lại.
   - [x] **PromptGuard:** Phát triển màng lọc chặn Prompt Injection (Hỏi những câu không liên quan đến nông nghiệp).
+  - [ ] **Hỗ trợ Tiếng Việt không dấu:** Nâng cấp PromptGuard và Intent Classifier để xử lý tốt câu hỏi tiếng Việt không dấu (vd: "cay ca phe bi vang la"), tránh từ chối nhầm câu hỏi hợp lệ của bà con.
 
 - [x] **📈 Trục 2: Reliability (Độ tin cậy / Chống ảo giác)**
   - [x] Liên kết hệ thống Chatbot với bộ dữ liệu đã được nạp ở **Giai đoạn 0**.
@@ -55,6 +57,7 @@ Tài liệu này liệt kê các hạng mục công việc (TODO) còn lại sau
 - [ ] **Tối ưu hóa UI/UX cho Nông dân:**
   - [ ] Phóng to các nút bấm "Ghi âm" và "Chụp nấm bệnh", sử dụng màu sắc có độ tương phản cao để người lớn tuổi dễ thao tác ngoài nắng gắt ngoài đồng.
   - [ ] Thêm trạng thái "AI đang suy nghĩ..." (Typing indicator) trong màn hình Chatbox và hiệu ứng Skeleton Loading cho Cẩm nang.
+  - [ ] **Streaming Trả lời (SSE):** Cập nhật API Chat để stream kết quả từng chữ về Frontend, giúp người dùng thấy chữ hiện ra ngay lập tức, tránh cảm giác ứng dụng bị treo.
 
 ---
 
