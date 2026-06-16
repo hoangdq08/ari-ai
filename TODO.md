@@ -29,7 +29,7 @@ Tài liệu này liệt kê các hạng mục công việc (TODO) còn lại sau
 - [x] **🛡️ Trục 1: Robustness (Bền bỉ / Chống lỗi)**
   - [x] **CleanImg:** Xây dựng module đánh giá ảnh đầu vào. Tự động từ chối ảnh mờ, rung tay, sai góc độ và yêu cầu nông dân chụp lại.
   - [x] **PromptGuard:** Phát triển màng lọc chặn Prompt Injection (Hỏi những câu không liên quan đến nông nghiệp).
-  - [ ] **Hỗ trợ Tiếng Việt không dấu:** Nâng cấp PromptGuard và Intent Classifier để xử lý tốt câu hỏi tiếng Việt không dấu (vd: "cay ca phe bi vang la"), tránh từ chối nhầm câu hỏi hợp lệ của bà con.
+  - [x] **Hỗ trợ Tiếng Việt không dấu:** Nâng cấp PromptGuard và Intent Classifier để xử lý tốt câu hỏi tiếng Việt không dấu (vd: "cay ca phe bi vang la"), tránh từ chối nhầm câu hỏi hợp lệ của bà con.
 
 - [x] **📈 Trục 2: Reliability (Độ tin cậy / Chống ảo giác)**
   - [x] Liên kết hệ thống Chatbot với bộ dữ liệu đã được nạp ở **Giai đoạn 0**.

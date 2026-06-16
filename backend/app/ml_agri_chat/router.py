@@ -23,6 +23,8 @@ from app.ml_agri_chat.modules.intent_classifier import (
 from app.ml_agri_chat.modules.llm_advisor import ControlledAdvisor
 from app.ml_agri_chat.modules.logger import get_request_logger
 from app.ml_agri_chat.modules.prompt_guard import DISCLAIMER, validate_question
+from app.ml_agri_chat.modules.accent_restoration import restore_vietnamese_accents
+from app.shared.text_utils import needs_accent_restoration
 from app.ml_agri_chat.modules.rag import AgriculturalRAG
 from app.ml_agri_chat.modules.search_discovery import SearchDiscovery
 from app.ml_agri_chat.modules.source_policy import source_review_decision, source_warnings
@@ -187,6 +189,13 @@ def _effective_question(question: str, history: list[dict[str, str]]) -> str:
 def chat(request: Request, payload: ChatRequest) -> dict:
     request_id = str(uuid4())
     log = get_request_logger(request_id)
+    
+    if needs_accent_restoration(payload.question):
+        restored = restore_vietnamese_accents(payload.question, advisor.llm_client)
+        if restored and restored != payload.question:
+            _log_activity(request_id, "chat", "accent_restoration", "Khôi phục dấu", {"original": payload.question, "restored": restored})
+            payload.question = restored
+
     conversation_history = _chat_history(payload.history)
     effective_question = _effective_question(payload.question, conversation_history)
     _log_activity(

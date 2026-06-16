@@ -25,13 +25,15 @@ from __future__ import annotations
 import re
 import unicodedata
 
+from app.shared.text_utils import normalize_vietnamese
+
 
 DISCLAIMER = "Thông tin chỉ mang tính hỗ trợ, không thay thế chuyên gia nông nghiệp."
 
 INJECTION_PATTERNS = [
-    r"bỏ qua (hướng dẫn|quy tắc|system)",
+    r"bo qua (huong dan|quy tac|system)",
     r"ignore (previous|system|developer)",
-    r"tiết lộ prompt",
+    r"tiet lo prompt",
     r"system prompt",
 ]
 
@@ -86,8 +88,8 @@ def validate_question(question: str) -> tuple[bool, str | None]:
     truth for what counts as "off topic" and can leverage an LLM-backed
     fallback for ambiguous cases.
     """
-    lowered = question.lower()
-    if any(re.search(pattern, lowered) for pattern in INJECTION_PATTERNS):
+    normalized = normalize_vietnamese(question)
+    if any(re.search(pattern, normalized) for pattern in INJECTION_PATTERNS):
         return False, "Không thể xử lý yêu cầu có dấu hiệu prompt injection."
     return True, None
 
@@ -99,7 +101,7 @@ def basic_chat_response(question: str) -> dict[str, str] | None:
     production chat endpoint uses `CascadeIntentClassifier.canned_response`
     instead, which delegates to the same intent labels.
     """
-    normalized = _normalize_text(question)
+    normalized = normalize_vietnamese(question)
     compact = re.sub(r"[^\w\s]", " ", normalized)
     compact = re.sub(r"\s+", " ", compact).strip()
     if compact in GREETING_PATTERNS:
@@ -149,8 +151,3 @@ def validate_advice_text(text: str) -> list[str]:
     return issues
 
 
-def _normalize_text(text: str) -> str:
-    lowered = text.lower().strip()
-    normalized = unicodedata.normalize("NFD", lowered)
-    without_marks = "".join(char for char in normalized if unicodedata.category(char) != "Mn")
-    return without_marks.replace("đ", "d")

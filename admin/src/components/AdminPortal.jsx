@@ -24,9 +24,8 @@ function NavLink({ href, active, icon: Icon, title, subtitle, onNavigate }) {
         event.preventDefault();
         onNavigate(href);
       }}
-      className={`group flex items-center gap-3 rounded-xl border px-3 py-2.5 transition ${
-        active ? "border-emerald-200 bg-emerald-50 text-emerald-950 shadow-sm" : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-      }`}
+      className={`group flex items-center gap-3 rounded-xl border px-3 py-2.5 transition ${active ? "border-emerald-200 bg-emerald-50 text-emerald-950 shadow-sm" : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+        }`}
     >
       <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${active ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500 group-hover:bg-white"}`}>
         <Icon className="h-5 w-5" strokeWidth={2.5} />
@@ -124,11 +123,11 @@ export default function AdminPortal({ apiBase, userAppUrl = "/", theme, onToggle
                     ? "Thu thập dữ liệu"
                     : active === "trust"
                       ? "Tin cậy AI"
-                    : active === "ops"
-                      ? "Nhật ký vận hành"
-                      : active === "reports"
-                        ? "Báo cáo vận hành"
-                        : "Tổng quan dữ liệu"}
+                      : active === "ops"
+                        ? "Nhật ký vận hành"
+                        : active === "reports"
+                          ? "Báo cáo vận hành"
+                          : "Tổng quan dữ liệu"}
                 </h1>
               </div>
               <div className="flex items-center gap-2">
