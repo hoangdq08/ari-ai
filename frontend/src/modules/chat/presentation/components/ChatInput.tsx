@@ -1,9 +1,40 @@
 "use client";
 
-import { Send, Image as ImageIcon, Mic, Camera as CameraIcon, ImagePlus } from "lucide-react";
+import {
+  Send,
+  Image as ImageIcon,
+  Mic,
+  Camera as CameraIcon,
+  ImagePlus,
+} from "lucide-react";
 import { useRef, useState, useEffect } from "react";
 import { useChat } from "../hooks/useChat";
 import { useDiagnoseImage } from "@/modules/diagnostics/presentation/hooks/useDiagnoseImage";
+
+type SpeechRecognitionResult = {
+  transcript: string;
+};
+
+type SpeechRecognitionResultEvent = {
+  results: ArrayLike<ArrayLike<SpeechRecognitionResult>>;
+};
+
+type SpeechRecognitionInstance = {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+
+type SpeechRecognitionWindow = Window & {
+  SpeechRecognition?: new () => SpeechRecognitionInstance;
+  webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
+};
 
 export function ChatInput() {
   const [text, setText] = useState("");
@@ -15,7 +46,7 @@ export function ChatInput() {
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const startXRef = useRef<number | null>(null);
 
   const { submitMessage, setTyping, addMessage, isTyping } = useChat();
@@ -77,9 +108,10 @@ export function ChatInput() {
         addMessage({
           id: Date.now().toString(),
           role: "ai",
-          content: "Xin lỗi bà con, hệ thống đang gặp lỗi. Vui lòng thử lại sau.",
+          content:
+            "Xin lỗi bà con, hệ thống đang gặp lỗi. Vui lòng thử lại sau.",
         });
-      }
+      },
     });
 
     if (galleryInputRef.current) galleryInputRef.current.value = "";
@@ -90,13 +122,18 @@ export function ChatInput() {
     e.preventDefault();
     try {
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    } catch (err) { }
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    } catch {
+      // Ignore pointer capture failures on browsers that do not support it.
+    }
+    const speechWindow = window as SpeechRecognitionWindow;
+    const SpeechRecognition =
+      speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       addMessage({
         id: Date.now().toString(),
         role: "ai",
-        content: "Trình duyệt hiện chưa hỗ trợ nhận diện giọng nói. Bà con vui lòng gõ câu hỏi vào ô chat nhé.",
+        content:
+          "Trình duyệt hiện chưa hỗ trợ nhận diện giọng nói. Bà con vui lòng gõ câu hỏi vào ô chat nhé.",
       });
       return;
     }
@@ -114,7 +151,7 @@ export function ChatInput() {
     recognition.lang = "vi-VN";
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event) => {
       const transcript = event.results?.[0]?.[0]?.transcript || "";
       if (transcript.trim()) {
         handleSendText(transcript);
@@ -124,7 +161,8 @@ export function ChatInput() {
       addMessage({
         id: Date.now().toString(),
         role: "ai",
-        content: "Mình chưa nghe rõ câu hỏi. Bà con thử nói lại gần micro hơn hoặc gõ trực tiếp nhé.",
+        content:
+          "Mình chưa nghe rõ câu hỏi. Bà con thử nói lại gần micro hơn hoặc gõ trực tiếp nhé.",
       });
     };
     recognition.onend = () => {
@@ -148,8 +186,11 @@ export function ChatInput() {
   const handleStopRecording = (e?: React.PointerEvent) => {
     e?.preventDefault();
     try {
-      if (e) (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch (err) { }
+      if (e)
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      // Ignore pointer capture release failures when the browser does not support it.
+    }
     startXRef.current = null;
     if (!isRecording) return;
 
@@ -162,8 +203,11 @@ export function ChatInput() {
   const handleCancelRecording = (e?: React.PointerEvent) => {
     e?.preventDefault();
     try {
-      if (e) (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch (err) { }
+      if (e)
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      // Ignore pointer capture release failures when the browser does not support it.
+    }
     startXRef.current = null;
     if (!isRecording) return;
 
@@ -183,7 +227,10 @@ export function ChatInput() {
   return (
     <>
       {showImageMenu && (
-        <div className="fixed inset-0 z-40 pointer-events-auto bg-transparent" onClick={() => setShowImageMenu(false)}></div>
+        <div
+          className="fixed inset-0 z-40 pointer-events-auto bg-transparent"
+          onClick={() => setShowImageMenu(false)}
+        ></div>
       )}
 
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-[448px] px-4 z-40 pointer-events-none safe-area-pb">
@@ -230,10 +277,14 @@ export function ChatInput() {
           {!isRecording && (
             <button
               onClick={() => setShowImageMenu(!showImageMenu)}
-              className={`p-2.5 transition-colors rounded-full flex-shrink-0 active:scale-95 ${showImageMenu ? "bg-emerald-100 text-emerald-600" : "text-slate-500 hover:text-emerald-600 bg-slate-100/80 hover:bg-emerald-50"
-                }`}
+              className={`min-h-12 min-w-12 p-3 transition-colors rounded-full flex-shrink-0 active:scale-95 touch-manipulation ${
+                showImageMenu
+                  ? "bg-emerald-100 text-emerald-700 ring-2 ring-emerald-200"
+                  : "text-slate-600 hover:text-emerald-700 bg-slate-100/80 hover:bg-emerald-50"
+              }`}
+              aria-label="Chọn ảnh"
             >
-              <ImageIcon className="w-[22px] h-[22px]" />
+              <ImageIcon className="w-[24px] h-[24px]" />
             </button>
           )}
 
@@ -242,9 +293,13 @@ export function ChatInput() {
               <div className="w-full flex items-center justify-between px-3 h-[48px] bg-red-50 border border-red-100/80 rounded-full">
                 <div className="flex items-center gap-2.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></div>
-                  <span className="text-red-500 font-mono font-bold text-[15px] tracking-wide">{formatTime(recordingTime)}</span>
+                  <span className="text-red-500 font-mono font-bold text-[15px] tracking-wide">
+                    {formatTime(recordingTime)}
+                  </span>
                 </div>
-                <span className="text-slate-400 text-[13px] font-medium mr-1 animate-pulse select-none">&lt; Trượt để hủy</span>
+                <span className="text-slate-400 text-[13px] font-medium mr-1 animate-pulse select-none">
+                  &lt; Trượt để hủy
+                </span>
               </div>
             ) : (
               <>
@@ -270,9 +325,9 @@ export function ChatInput() {
               onClick={() => handleSendText()}
               disabled={isTyping}
               aria-label="Gửi tin nhắn"
-              className="p-2.5 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-all shadow-sm active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 flex-shrink-0"
+              className="min-h-12 min-w-12 p-3 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition-all shadow-sm active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 flex-shrink-0 touch-manipulation"
             >
-              <Send className="w-[22px] h-[22px] ml-0.5" strokeWidth={2.5} />
+              <Send className="w-[24px] h-[24px] ml-0.5" strokeWidth={2.5} />
             </button>
           ) : (
             <div className="relative">
@@ -288,12 +343,14 @@ export function ChatInput() {
                 onPointerUp={handleStopRecording}
                 onPointerCancel={handleCancelRecording}
                 onContextMenu={(e) => e.preventDefault()}
-                className={`p-2.5 transition-all duration-200 flex-shrink-0 touch-none select-none ${isRecording
-                  ? "bg-emerald-500 text-white rounded-full scale-125 shadow-[0_5px_15px_rgba(16,185,129,0.4)] mr-1"
-                  : "text-emerald-600 bg-emerald-100/80 hover:bg-emerald-200 rounded-full shadow-sm"
-                  }`}
+                className={`min-h-12 min-w-12 p-3 transition-all duration-200 flex-shrink-0 touch-none select-none ${
+                  isRecording
+                    ? "bg-emerald-600 text-white rounded-full scale-125 shadow-[0_5px_15px_rgba(16,185,129,0.4)] mr-1"
+                    : "text-emerald-700 bg-emerald-100/80 hover:bg-emerald-200 rounded-full shadow-sm"
+                }`}
+                aria-label="Ghi âm"
               >
-                <Mic className="w-[22px] h-[22px]" />
+                <Mic className="w-[24px] h-[24px]" />
               </button>
             </div>
           )}

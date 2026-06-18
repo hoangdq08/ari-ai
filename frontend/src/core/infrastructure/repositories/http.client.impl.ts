@@ -2,12 +2,37 @@ import axios, { AxiosInstance } from 'axios';
 import { HttpClientRepository } from '../../domain/repositories/HttpClientRepository';
 import { HttpRequestConfig } from '../../domain/models/HttpRequestConfig';
 
+const DEFAULT_API_PREFIX = '/api/v1';
+
+function resolveBaseUrl(rawBaseUrl?: string): string {
+  const trimmed = (rawBaseUrl || '').trim();
+
+  if (!trimmed) {
+    return DEFAULT_API_PREFIX;
+  }
+
+  if (trimmed.startsWith('/')) {
+    return trimmed.replace(/\/$/, '');
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (['localhost', '127.0.0.1', '::1'].includes(parsed.hostname)) {
+      return DEFAULT_API_PREFIX;
+    }
+
+    return `${parsed.origin}${parsed.pathname.replace(/\/$/, '')}`;
+  } catch {
+    return trimmed;
+  }
+}
+
 export class HttpClientRepositoryImpl implements HttpClientRepository {
   private client: AxiosInstance;
 
   constructor() {
     this.client = axios.create({
-      baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api/v1',
+      baseURL: resolveBaseUrl(process.env.NEXT_PUBLIC_API_URL),
       headers: {
         'Content-Type': 'application/json',
       },
@@ -27,11 +52,11 @@ export class HttpClientRepositoryImpl implements HttpClientRepository {
     return this.client.get<T>(url, config);
   }
 
-  async post<T>(url: string, data?: any, config?: HttpRequestConfig): Promise<{ data: T }> {
+  async post<T>(url: string, data?: unknown, config?: HttpRequestConfig): Promise<{ data: T }> {
     return this.client.post<T>(url, data, config);
   }
 
-  async put<T>(url: string, data?: any, config?: HttpRequestConfig): Promise<{ data: T }> {
+  async put<T>(url: string, data?: unknown, config?: HttpRequestConfig): Promise<{ data: T }> {
     return this.client.put<T>(url, data, config);
   }
 
