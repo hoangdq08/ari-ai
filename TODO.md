@@ -43,7 +43,7 @@ Tài liệu này liệt kê các hạng mục công việc (TODO) còn lại sau
   - [ ] Tích hợp API chuyển Text thành Giọng nói (Text-to-Speech) để máy tự đọc kết quả cho nông dân bị hạn chế khả năng đọc chữ.
 
 - [ ] **🤝 Trục 5: Social Impact (Tác động xã hội)**
-  - [ ] Chuyển đổi toàn bộ LLM sang phiên bản tối ưu chi phí (Gemini Flash + Local Whisper) để duy trì app ở mức **miễn phí 0đ**, phục vụ nông dân nghèo.
+  - [ ] Chuyển đổi toàn bộ LLM sang phiên bản tối ưu chi phí (Gemini Flash + Local Whisper) để duy trì app ở mức **miễn phí 0đ**
 
 ---
 
