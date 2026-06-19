@@ -14,7 +14,7 @@ export function HandbookScreen() {
   const skeletonCards = Array.from({ length: 4 }, (_, index) => index);
 
   return (
-    <div className="flex flex-col min-h-full pb-24">
+    <div className="flex flex-col pb-24">
       {/* Sticky Wrapper: Header + Search + Categories */}
       <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-md pb-3 pt-6 px-4 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] border-b border-slate-100/80 transition-all">
         <h1 className="font-extrabold text-[32px] text-slate-900 mb-2 tracking-tight">
