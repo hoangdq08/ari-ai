@@ -2,6 +2,13 @@
 
 Tài liệu này liệt kê các hạng mục công việc (TODO) còn lại sau khi dự án đã hoàn tất pha Khởi tạo Kiến trúc (Clean Architecture + DDD) và Cấu hình Môi trường (Docker). Các thành viên trong team sử dụng file này để bám sát mục tiêu, **đặc biệt tuân thủ chặt chẽ 5 Trục AI cốt lõi**.
 
+## 👥 Phân công nhiệm vụ
+
+- **Cả 3 thành viên**: Thảo luận giải pháp và kiến trúc hệ thống.
+- **Toàn**: Làm tài liệu, kiểm thử, scraping (một phần), devops (một phần).
+- **Thái**: Scraping và một phần frontend.
+- **Hoàng**: Fullstack (backend + frontend).
+
 ---
 
 ## 📚 Giai đoạn 0: Tiền xử lý & Xây dựng Cơ sở Tri thức (Data Pipeline)

@@ -6,24 +6,24 @@ Nông Trí AI được thiết kế theo kiến trúc **Microservices** kết h�
 
 ```mermaid
 graph TD
-    classDef frontend fill:#eff6ff,stroke:#3b82f6,stroke-width:2px
-    classDef backend fill:#f0fdf4,stroke:#22c55e,stroke-width:2px
-    classDef admin fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
-    classDef db fill:#f5f3ff,stroke:#8b5cf6,stroke-width:2px
+    User["Người dùng"] --> Frontend
+    AdminUser["Quản trị viên"] --> AdminPortal
 
-    User["🧑‍🌾 Người dùng"] --> Frontend
-    Admin["🛠 Admin"] --> AdminPortal
-
-    subgraph Docker["Docker Compose Network"]
-        Frontend["📱 Frontend<br>Next.js :8080"]:::frontend
-        AdminPortal["🛠 Admin Portal<br>Vite + React :8082"]:::admin
-        Backend["⚙️ Backend API<br>FastAPI :8081"]:::backend
-        ChromaDB[("🗄️ ChromaDB<br>Vector Store :8000")]:::db
+    subgraph DockerNet["Docker Compose Network"]
+        Frontend["Frontend (Next.js :8080)"]
+        AdminPortal["Admin Portal (Vite + React :8082)"]
+        Backend["Backend API (FastAPI :8081)"]
+        ChromaDB[("ChromaDB (Vector Store :8000)")]
 
         Frontend -->|"REST /api/v1/ml-agri"| Backend
         AdminPortal -->|"REST /api/v1/ml-agri"| Backend
         Backend -->|"Embeddings CRUD"| ChromaDB
     end
+
+    style Frontend fill:#eff6ff,stroke:#3b82f6
+    style AdminPortal fill:#fef3c7,stroke:#f59e0b
+    style Backend fill:#f0fdf4,stroke:#22c55e
+    style ChromaDB fill:#f5f3ff,stroke:#8b5cf6
 ```
 
 ## 🧱 Lớp Kiến trúc Backend (Clean Architecture)

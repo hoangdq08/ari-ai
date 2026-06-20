@@ -3,40 +3,33 @@
 ## Sơ đồ Luồng End-to-End
 
 ```mermaid
-flowchart TD
-    classDef userLayer fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a,rx:10,ry:10
-    classDef securityLayer fill:#fef2f2,stroke:#ef4444,stroke-width:2px,color:#991b1b,rx:10,ry:10
-    classDef coreLayer fill:#f0fdf4,stroke:#22c55e,stroke-width:2px,color:#166534,rx:10,ry:10
-    classDef dbLayer fill:#f5f3ff,stroke:#8b5cf6,stroke-width:2px,color:#5b21b6,rx:10,ry:10
-    classDef orchestrator fill:#fff7ed,stroke:#f97316,stroke-width:2px,color:#9a3412,rx:10,ry:10
-
-    subgraph Client["🧑‍🌾 GIAO DIỆN ĐẦU VÀO"]
-        direction LR
-        UI["📱 Web / App Mobile"]:::userLayer
-        Voice["🎙️ Ghi âm Giọng Nói"]:::userLayer
-        Cam["📸 Chụp Mẫu Bệnh"]:::userLayer
+graph TD
+    subgraph Client["GIAO DIỆN ĐẦU VÀO"]
+        UI["Web / App Mobile"]
+        Voice["Ghi âm Giọng nói"]
+        Cam["Chụp Mẫu bệnh"]
     end
 
-    subgraph Robustness["🛡️ LỚP KIỂM DUYỆT"]
-        STT["Phân Tích & Dịch Giọng<br>(Speech-to-Text)"]:::securityLayer
-        CleanImg["Kiểm Tra Chất Lượng Ảnh<br>(Bộ Lọc Nhiễu)"]:::securityLayer
-        PromptGuard["Kiểm Duyệt Nội Dung<br>(Chống Hack/Jailbreak)"]:::securityLayer
-        Reject("🛑 Báo Lỗi / Từ Chối"):::securityLayer
+    subgraph Robustness["LỚP KIỂM DUYỆT"]
+        STT["Phân tích Giọng nói (Speech-to-Text)"]
+        CleanImg["Kiểm tra Chất lượng Ảnh (Bộ lọc nhiễu)"]
+        PromptGuard["Kiểm duyệt Nội dung (Chống Hack/Jailbreak)"]
+        Reject("Báo lỗi / Từ chối")
     end
 
-    subgraph Core["🧠 LÕI XỬ LÝ TRÍ TUỆ NHÂN TẠO"]
-        Orchestrator{"ĐIỀU PHỐI AI Router"}:::orchestrator
-        RAG["🔍 RAG Engine<br>(Truy tìm ngữ cảnh)"]:::coreLayer
-        LLM["🤖 Logic Chẩn Đoán<br>(Vision & LLM)"]:::coreLayer
+    subgraph Core["LÕI XỬ LÝ AI"]
+        Orchestrator{"ĐIỀU PHỐI AI Router"}
+        RAG["RAG Engine (Truy tìm ngữ cảnh)"]
+        LLM["Logic Chẩn đoán (Vision and LLM)"]
     end
 
-    subgraph DB["📚 CƠ SỞ TRI THỨC"]
-        Docs["Tài Liệu Nông Nghiệp<br>Khuyến Nông VN"]:::dbLayer
-        VectorDB[("Vector Database<br>ChromaDB")]:::dbLayer
+    subgraph DB["CƠ SỞ TRI THỨC"]
+        Docs["Tài liệu Nông nghiệp (Khuyến nông VN)"]
+        VectorDB[("Vector Database (ChromaDB)")]
     end
 
-    subgraph Output["✨ KẾT QUẢ ĐẦU RA"]
-        UI_Out["📱 Màn Hình Hiển Thị<br>Của Nông Dân"]:::userLayer
+    subgraph Output["KẾT QUẢ ĐẦU RA"]
+        UI_Out["Màn hình Hiển thị (Nông dân)"]
     end
 
     UI -->|"Nhập Text"| PromptGuard
@@ -44,22 +37,36 @@ flowchart TD
     Cam -->|"File Ảnh"| CleanImg
 
     STT -->|"Text"| PromptGuard
-    CleanImg -->|"Ảnh Đã Lọc"| PromptGuard
+    CleanImg -->|"Ảnh đã lọc"| PromptGuard
 
-    PromptGuard -->|"Hợp Lệ"| Orchestrator
-    PromptGuard -.->|"Vi Phạm"| Reject
+    PromptGuard -->|"Hợp lệ"| Orchestrator
+    PromptGuard -.->|"Vi phạm"| Reject
 
-    Docs -.->|"Nhúng Data (Embedding)"| VectorDB
-    Orchestrator -->|"Câu Hỏi"| RAG
-    
+    Docs -.->|"Nhúng Embedding"| VectorDB
+    Orchestrator -->|"Câu hỏi"| RAG
+
     RAG -->|"Truy vấn"| VectorDB
-    VectorDB -.->|"Trả Ngữ cảnh"| RAG
+    VectorDB -.->|"Trả ngữ cảnh"| RAG
 
-    RAG -->|"Gửi Ngữ Cảnh"| LLM
-    Orchestrator -->|"Gửi Ảnh Mẫu Bệnh"| LLM
+    RAG -->|"Gửi ngữ cảnh"| LLM
+    Orchestrator -->|"Gửi ảnh mẫu bệnh"| LLM
 
-    LLM ===>|"Trả Lời Khuyên & Nguồn Bệnh"| UI_Out
+    LLM ===>|"Kết quả và nguồn"| UI_Out
     Reject -.->|"Hiển thị lỗi"| UI_Out
+
+    style UI fill:#eff6ff,stroke:#3b82f6
+    style Voice fill:#eff6ff,stroke:#3b82f6
+    style Cam fill:#eff6ff,stroke:#3b82f6
+    style UI_Out fill:#eff6ff,stroke:#3b82f6
+    style STT fill:#fef2f2,stroke:#ef4444
+    style CleanImg fill:#fef2f2,stroke:#ef4444
+    style PromptGuard fill:#fef2f2,stroke:#ef4444
+    style Reject fill:#fef2f2,stroke:#ef4444
+    style Orchestrator fill:#fff7ed,stroke:#f97316
+    style RAG fill:#f0fdf4,stroke:#22c55e
+    style LLM fill:#f0fdf4,stroke:#22c55e
+    style Docs fill:#f5f3ff,stroke:#8b5cf6
+    style VectorDB fill:#f5f3ff,stroke:#8b5cf6
 ```
 
 ## 🎯 Các Luồng Xử lý Chính

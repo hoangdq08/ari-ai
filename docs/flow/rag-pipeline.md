@@ -5,43 +5,53 @@
 RAG Pipeline là trái tim của Nông Trí AI, đảm bảo mọi câu trả lời đều dựa trên tài liệu nông nghiệp chính thống, chống "ảo giác" (hallucination) của LLM.
 
 ```mermaid
-flowchart LR
-    classDef ingest fill:#f0fdf4,stroke:#22c55e
-    classDef retrieval fill:#eff6ff,stroke:#3b82f6
-    classDef generation fill:#fff7ed,stroke:#f97316
-    classDef policy fill:#fef2f2,stroke:#ef4444
+graph LR
+    subgraph Ingest["INGEST (Offline)"]
+        Crawl["Crawl (URL/Upload)"]
+        Clean["Text Cleaning"]
+        Policy["Source Policy (Đánh giá tin cậy)"]
+        Chunk["Chunking (Chia nhỏ văn bản)"]
+        Embed["Embedding (Text sang Vector)"]
+        Store[("ChromaDB (Vector Store)")]
 
-    subgraph Ingest["📥 INGEST PIPELINE (Offline)"]
-        Crawl["🌐 Crawl<br>URL/Upload"]:::ingest
-        Clean["🧹 Text Cleaning"]:::ingest
-        Policy["📋 Source Policy<br>Đánh giá độ tin cậy"]:::policy
-        Chunk["✂️ Chunking<br>chia nhỏ văn bản"]:::ingest
-        Embed["🧮 Embedding<br>Text → Vector"]:::ingest
-        Store[("🗄️ ChromaDB<br>Vector Store")]:::ingest
-        
         Crawl --> Clean --> Policy --> Chunk --> Embed --> Store
     end
 
-    subgraph Retrieval["🔍 RETRIEVAL (Online)"]
-        Query["❓ User Query"]:::retrieval
-        QEmbed["🧮 Query Embedding"]:::retrieval
-        Search["🔎 Similarity Search<br>Top-K Chunks"]:::retrieval
-        Rerank["📊 Re-rank<br>theo relevance score"]:::retrieval
-        
+    subgraph Retrieval["RETRIEVAL (Online)"]
+        Query["User Query"]
+        QEmbed["Query Embedding"]
+        Search["Similarity Search (Top-K Chunks)"]
+        Rerank["Re-rank (theo relevance)"]
+
         Query --> QEmbed --> Search --> Rerank
     end
 
-    subgraph Generation["🤖 GENERATION"]
-        Context["📚 Retrieved Context"]:::generation
-        Prompt["📝 System Prompt<br>+ Context + Question"]:::generation
-        LLM["🧠 LLM (Ollama)"]:::generation
-        Cite["📎 Citation<br>+ Source Attribution"]:::generation
-        
+    subgraph Generation["GENERATION"]
+        Context["Retrieved Context"]
+        Prompt["System Prompt (+ Context + Question)"]
+        LLM["LLM - Ollama"]
+        Cite["Citation (+ Source Attribution)"]
+
         Context --> Prompt --> LLM --> Cite
     end
 
     Store -.->|"Vector Search"| Search
     Rerank --> Context
+
+    style Crawl fill:#f0fdf4,stroke:#22c55e
+    style Clean fill:#f0fdf4,stroke:#22c55e
+    style Chunk fill:#f0fdf4,stroke:#22c55e
+    style Embed fill:#f0fdf4,stroke:#22c55e
+    style Store fill:#f0fdf4,stroke:#22c55e
+    style Policy fill:#fef2f2,stroke:#ef4444
+    style Query fill:#eff6ff,stroke:#3b82f6
+    style QEmbed fill:#eff6ff,stroke:#3b82f6
+    style Search fill:#eff6ff,stroke:#3b82f6
+    style Rerank fill:#eff6ff,stroke:#3b82f6
+    style Context fill:#fff7ed,stroke:#f97316
+    style Prompt fill:#fff7ed,stroke:#f97316
+    style LLM fill:#fff7ed,stroke:#f97316
+    style Cite fill:#fff7ed,stroke:#f97316
 ```
 
 ## 📥 Giai đoạn 1: Ingest Pipeline

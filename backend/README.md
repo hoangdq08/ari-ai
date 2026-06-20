@@ -30,11 +30,11 @@ flowchart TD
     classDef infra fill:#fce7f3,stroke:#db2777,stroke-width:2px,color:#9d174d,rx:8,ry:8
     classDef presentation fill:#dcfce3,stroke:#16a34a,stroke-width:2px,color:#166534,rx:8,ry:8
     
-    P["🖥️ Presentation Layer<br/>(FastAPI Routes / Controllers)"]:::presentation
-    A["⚙️ Application Layer<br/>(Use Cases / Services)"]:::application
-    D["🧱 Domain Layer<br/>(Models / Repositories)"]:::domain
-    I["🌐 Infrastructure Layer<br/>(DB / AI Models / Faster-Whisper)"]:::infra
-    C["⚙️ Core / DI<br/>(Composition Root / Dependencies)"]:::core
+    P["🖥️ Presentation Layer (FastAPI Routes / Controllers)"]:::presentation
+    A["⚙️ Application Layer (Use Cases / Services)"]:::application
+    D["🧱 Domain Layer (Models / Repositories)"]:::domain
+    I["🌐 Infrastructure Layer (DB / AI Models / Faster-Whisper)"]:::infra
+    C["⚙️ Core / DI (Composition Root / Dependencies)"]:::core
     
     C -. "1. Khởi tạo & Inject" .-> P
     C -. "1. Khởi tạo & Inject" .-> A

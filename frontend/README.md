@@ -26,10 +26,10 @@ flowchart TD
     classDef presentation fill:#dcfce3,stroke:#16a34a,stroke-width:2px,color:#166534,rx:8,ry:8
     classDef core fill:#e0e7ff,stroke:#4f46e5,stroke-width:2px,color:#3730a3,rx:8,ry:8
     
-    P["🖥️ Presentation Layer<br/>(UI Components, Hooks, Stores)"]:::presentation
-    C["⚙️ Core / DI<br/>(Composition Root / Registry)"]:::core
-    D["🧱 Domain Layer<br/>(Models, Repository Interfaces)"]:::domain
-    I["🌐 Infrastructure Layer<br/>(API Implementations)"]:::infra
+    P["🖥️ Presentation Layer (UI Components, Hooks, Stores)"]:::presentation
+    C["⚙️ Core / DI (Composition Root / Registry)"]:::core
+    D["🧱 Domain Layer (Models, Repository Interfaces)"]:::domain
+    I["🌐 Infrastructure Layer (API Implementations)"]:::infra
     
     C -. "1. Khởi tạo & Tiêm (Inject) Dependencies" .-> P
     C -. "1. Quản lý vòng đời" .-> I
