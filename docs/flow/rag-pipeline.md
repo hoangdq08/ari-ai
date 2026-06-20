@@ -5,7 +5,7 @@
 RAG Pipeline là trái tim của Nông Trí AI, đảm bảo mọi câu trả lời đều dựa trên tài liệu nông nghiệp chính thống, chống "ảo giác" (hallucination) của LLM.
 
 ```mermaid
-graph LR
+graph TD
     subgraph Ingest["INGEST (Offline)"]
         Crawl["Crawl (URL/Upload)"]
         Clean["Text Cleaning"]
@@ -139,7 +139,7 @@ LUÔN trích dẫn nguồn cho mỗi thông tin.
 **Module:** `ml_agri_chat/modules/llm_advisor.py`
 
 - Inject context + system prompt + user question
-- Temperature: 0.3 (low creativity, high factual accuracy)
+- Temperature: cấu hình qua biến `NONGTRI_LLM_TEMPERATURE` (mặc định 0.1 - low creativity, high factual accuracy)
 - Max tokens: 1024
 - Post-processing: kiểm tra citation, format output
 

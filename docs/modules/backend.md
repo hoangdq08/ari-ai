@@ -133,7 +133,7 @@ backend/app/ml_agri_chat/
 
 - `ControlledAdvisor`: wrapper quanh Ollama
 - Default model: `qwen2.5:3b`
-- Temperature: 0.3 (low creativity)
+- Temperature: cấu hình qua biến `NONGTRI_LLM_TEMPERATURE` (mặc định 0.1 - low creativity)
 - System prompt ép buộc trích dẫn nguồn
 - Fallback: trả về disclaimer nếu không có context
 

@@ -145,6 +145,7 @@ Các cơ chế kiểm soát đang áp dụng:
 6. **Citation Requirement**: Mọi câu trả lời phải kèm nguồn
 7. **Feedback Isolation**: Feedback không tự động vào training
 8. **Coverage Monitoring**: Theo dõi độ phủ vùng miền, chủ đề
+9. **Low Temperature Configuration** (`NONGTRI_LLM_TEMPERATURE`): Cấu hình LLM hoạt động ở chế độ phi sáng tạo (mặc định 0.1) để tối đa hoá tính chính xác, kiểm soát rủi ro ảo giác (hallucination).
 
 ---
 
