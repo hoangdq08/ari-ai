@@ -49,8 +49,8 @@ Tài liệu này liệt kê các hạng mục công việc (TODO) còn lại sau
   - [ ] Tích hợp `faster-whisper` xử lý **Voice-to-Text** đa vùng miền (Bắc - Trung - Nam).
   - [ ] Tích hợp API chuyển Text thành Giọng nói (Text-to-Speech) để máy tự đọc kết quả cho nông dân bị hạn chế khả năng đọc chữ.
 
-- [ ] **🤝 Trục 5: Social Impact (Tác động xã hội)**
-  - [ ] Chuyển đổi toàn bộ LLM sang phiên bản tối ưu chi phí (Gemini Flash + Local Whisper) để duy trì app ở mức **miễn phí 0đ**
+- [x] **🤝 Trục 5: Social Impact (Tác động xã hội)**
+  - [x] Chuyển đổi toàn bộ LLM sang phiên bản tối ưu chi phí (DeepSeek Flash + Local Ollama) để duy trì app ở mức **miễn phí 0đ**
 
 ---
 
@@ -62,8 +62,8 @@ Tài liệu này liệt kê các hạng mục công việc (TODO) còn lại sau
   - [x] Hoàn thiện cơ chế gửi FormData (gồm file Hình ảnh / Âm thanh) từ máy người dùng lên server.
 
 - [ ] **Tối ưu hóa UI/UX cho Nông dân:**
-  - [ ] Phóng to các nút bấm "Ghi âm" và "Chụp nấm bệnh", sử dụng màu sắc có độ tương phản cao để người lớn tuổi dễ thao tác ngoài nắng gắt ngoài đồng.
-  - [ ] Thêm trạng thái "AI đang suy nghĩ..." (Typing indicator) trong màn hình Chatbox và hiệu ứng Skeleton Loading cho Cẩm nang.
+  - [x] Phóng to các nút bấm "Ghi âm" và "Chụp nấm bệnh", sử dụng màu sắc có độ tương phản cao để người lớn tuổi dễ thao tác ngoài nắng gắt ngoài đồng.
+  - [x] Thêm trạng thái "AI đang suy nghĩ..." (Typing indicator) trong màn hình Chatbox và hiệu ứng Skeleton Loading cho Cẩm nang.
   - [ ] **Streaming Trả lời (SSE):** Cập nhật API Chat để stream kết quả từng chữ về Frontend, giúp người dùng thấy chữ hiện ra ngay lập tức, tránh cảm giác ứng dụng bị treo.
 
 ---
@@ -72,17 +72,17 @@ Tài liệu này liệt kê các hạng mục công việc (TODO) còn lại sau
 *Mục tiêu: Dự án sẵn sàng đưa lên môi trường Production.*
 
 - [ ] **Kiểm thử (Testing):**
-  - [ ] Viết Unit Test cho các business rules ở tầng `Application` và `Domain`.
-  - [ ] Chạy bộ Test Dataset gồm 100 ảnh bệnh thực tế để đánh giá % độ chính xác của Gemini Vision.
+  - [x] Viết Unit Test cho các business rules ở tầng `Application` và `Domain`.
+  - [ ] Chạy bộ Test Dataset gồm 100 ảnh bệnh thực tế để đánh giá % độ chính xác của mô hình Vision.
 
 - [ ] **📊 Giám sát Hệ thống AI (LLMOps):**
   - [ ] Tích hợp `LangSmith` (hoặc tương đương) để theo dõi chi phí (Token usage) và giám sát thời gian phản hồi (Latency) của mô hình.
-  - [ ] Lưu log các câu hỏi bị `PromptGuard` từ chối để liên tục cải thiện bộ lọc bảo mật.
+  - [x] Lưu log các câu hỏi bị `PromptGuard` từ chối để liên tục cải thiện bộ lọc bảo mật.
 
-- [ ] **Bảo mật & Hiệu suất:**
-  - [ ] Tối ưu hóa kích thước Docker Image (đặc biệt là Backend do chứa các thư viện AI nặng).
-  - [ ] Thiết lập Rate Limit cho các API công khai để tránh bị spam làm cạn kiệt API Key.
+- [x] **Bảo mật & Hiệu suất:**
+  - [x] Tối ưu hóa kích thước Docker Image (đặc biệt là Backend do chứa các thư viện AI nặng).
+  - [x] Thiết lập Rate Limit cho các API công khai để tránh bị spam làm cạn kiệt API Key.
 
 - [ ] **CI/CD & Deployment:**
   - [ ] Cấu hình Github Actions tự động kiểm tra code (Lint/Format) khi có Pull Request.
-  - [ ] Triển khai hệ thống lên server (VPS / Cloud) qua file `docker-compose.yml` (Docker-Only).
+  - [x] Triển khai hệ thống lên server (VPS / Cloud) qua file `docker-compose.yml` (Docker-Only).
