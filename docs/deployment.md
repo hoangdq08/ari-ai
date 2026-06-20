@@ -20,11 +20,11 @@ Nông Trí AI được thiết kế để triển khai qua **Docker Compose**, �
 
 ## 🐳 Triển khai với Docker
 
-### Quick Start (1 lệnh)
+### Khởi chạy nhanh (1 lệnh)
 
 ```bash
 # Từ thư mục gốc dự án
-./start.sh --docker
+make docker
 ```
 
 Hoặc thủ công:

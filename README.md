@@ -64,15 +64,17 @@ Dự án được cấu trúc theo mô hình **Microservices** với **Domain-Dr
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Khởi chạy nhanh (Quick Start)
 
-### Yêu cầu duy nhất
+### Yêu cầu hệ thống
 **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** (hoặc Docker Engine)
 
-### Khởi chạy (1 lệnh)
+### Khởi chạy bằng Docker (Khuyến nghị)
+
+Chỉ với một lệnh duy nhất:
 
 ```bash
-./start.sh --docker
+make docker
 ```
 
 Hoặc thủ công:
@@ -106,8 +108,7 @@ ari_ai/
 ├── docs/              # 📚 Tài liệu dự án (mới!)
 ├── plan/              # 🗓️ Kế hoạch chi tiết
 ├── docker-compose.yml # 🐳 Docker Compose config
-├── Makefile           # 🔧 Dev workflow shortcuts
-├── start.sh           # 🚀 One-click startup script
+├── Makefile           # 🚀 Các lệnh tiện ích tự động (start, docker, install)
 └── TODO.md            # 📝 Lộ trình phát triển
 ```
 

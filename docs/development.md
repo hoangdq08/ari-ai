@@ -13,11 +13,16 @@ Hướng dẫn này dành cho developer muốn thiết lập môi trường phá
 
 ## 🚀 Quick Start (Local)
 
-### Cách 1: Dùng start.sh (khuyến nghị)
+### Cách 1: Dùng Makefile (khuyến nghị)
+
+Sử dụng `Makefile` là phương pháp nhanh gọn và ổn định nhất để thiết lập môi trường.
 
 ```bash
-# Cài đặt dependencies và chạy tất cả services local
-./start.sh
+# 1. Cài đặt toàn bộ dependencies cho backend, frontend và admin
+make install
+
+# 2. Khởi chạy tất cả services (song song)
+make start
 
 # Truy cập:
 # Frontend: http://localhost:8080
@@ -25,26 +30,18 @@ Hướng dẫn này dành cho developer muốn thiết lập môi trường phá
 # API Docs: http://localhost:8081/api/v1/docs
 ```
 
-Script tự động:
-1. Tạo `.env` từ `.env.example` nếu chưa có
-2. Tạo virtualenv Python 3.11
-3. Cài đặt dependencies cho backend + frontend + admin
-4. Khởi chạy cả 3 services song song
-
-### Cách 2: Dùng Makefile
-
+Nếu bạn muốn chạy từng dịch vụ riêng biệt để tiện debug, có thể dùng:
 ```bash
-# Cài đặt tất cả dependencies
-make install
-
-# Chạy tất cả services (song song)
-make start
-
-# Hoặc chạy từng service riêng
 make start-backend
 make start-frontend
 make start-admin
 ```
+
+Quy trình lệnh `make` sẽ tự động:
+1. Tạo file `.env` từ `.env.example` nếu chưa có.
+2. Thiết lập virtualenv Python 3.11 (dành cho backend).
+3. Cài đặt đầy đủ dependencies.
+4. Khởi chạy ứng dụng theo đúng cổng quy định.
 
 ### Cách 3: Thủ công
 

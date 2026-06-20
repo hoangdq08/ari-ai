@@ -73,51 +73,78 @@ graph TD
 
 ### Luồng 1: Hỏi đáp Văn bản (Chat)
 
-```
-Người dùng nhập text
-    → PromptGuard (kiểm duyệt nội dung) 
-        → Intent Classifier (phân loại câu hỏi)
-            → [Nếu là câu hỏi nông nghiệp]
-                → RAG Engine (truy xuất ngữ cảnh từ Vector DB)
-                → LLM Advisor (sinh câu trả lời + trích dẫn nguồn)
-                → Hiển thị kết quả
-            → [Nếu không phải]
-                → Từ chối, gợi ý chủ đề nông nghiệp
+```mermaid
+graph TD
+    Input["Người dùng nhập text"] --> PG["PromptGuard (Kiểm duyệt nội dung)"]
+    PG --> IC["Intent Classifier (Phân loại câu hỏi)"]
+    IC -->|"Nếu là câu hỏi nông nghiệp"| RAG["RAG Engine (Truy xuất ngữ cảnh từ Vector DB)"]
+    RAG --> LLM["LLM Advisor (Sinh câu trả lời + trích dẫn nguồn)"]
+    LLM --> Output["Hiển thị kết quả"]
+    IC -->|"Nếu không phải"| Reject["Từ chối, gợi ý chủ đề nông nghiệp"]
+    
+    style Input fill:#eff6ff,stroke:#3b82f6
+    style Output fill:#eff6ff,stroke:#3b82f6
+    style PG fill:#fef2f2,stroke:#ef4444
+    style IC fill:#fef2f2,stroke:#ef4444
+    style Reject fill:#fef2f2,stroke:#ef4444
+    style RAG fill:#f0fdf4,stroke:#22c55e
+    style LLM fill:#fff7ed,stroke:#f97316
 ```
 
 ### Luồng 2: Chẩn đoán Ảnh (Diagnostics)
 
-```
-Người dùng chụp/gửi ảnh
-    → CleanImg (kiểm tra chất lượng: mờ, rung, sai góc)
-        → [Nếu ảnh không đạt] → Yêu cầu chụp lại
-        → [Nếu ảnh đạt]
-            → Vision Model (CoffeeVisionClassifier - Keras)
-                → Phân loại bệnh + độ tin cậy
-                → LLM Advisor (giải thích kết quả + khuyến nghị)
-                → Hiển thị chẩn đoán + nguồn tham khảo
+```mermaid
+graph TD
+    Input["Người dùng chụp/gửi ảnh"] --> CleanImg["CleanImg (Kiểm tra chất lượng: mờ, rung, sai góc)"]
+    CleanImg -->|"Nếu ảnh không đạt"| Reject["Yêu cầu chụp lại"]
+    CleanImg -->|"Nếu ảnh đạt"| Vision["Vision Model (CoffeeVisionClassifier - Keras)"]
+    Vision -->|"Phân loại bệnh + độ tin cậy"| LLM["LLM Advisor (Giải thích kết quả + khuyến nghị)"]
+    LLM --> Output["Hiển thị chẩn đoán + nguồn tham khảo"]
+
+    style Input fill:#eff6ff,stroke:#3b82f6
+    style Output fill:#eff6ff,stroke:#3b82f6
+    style Reject fill:#fef2f2,stroke:#ef4444
+    style CleanImg fill:#fef2f2,stroke:#ef4444
+    style Vision fill:#f0fdf4,stroke:#22c55e
+    style LLM fill:#fff7ed,stroke:#f97316
 ```
 
 ### Luồng 3: Giọng nói (Voice - kế hoạch)
 
-```
-Người dùng ghi âm
-    → Faster-Whisper (Speech-to-Text offline)
-        → Accent Restoration (khôi phục dấu tiếng Việt)
-            → PromptGuard
-                → [Tiếp tục như Luồng 1]
+```mermaid
+graph TD
+    Input["Người dùng ghi âm"] --> STT["Faster-Whisper (Speech-to-Text offline)"]
+    STT --> Accent["Accent Restoration (Khôi phục dấu tiếng Việt)"]
+    Accent --> PG["PromptGuard"]
+    PG -->|"Tiếp tục như Luồng 1"| L1["Luồng 1 (Chat)"]
+
+    style Input fill:#eff6ff,stroke:#3b82f6
+    style L1 fill:#eff6ff,stroke:#3b82f6
+    style STT fill:#fef2f2,stroke:#ef4444
+    style Accent fill:#f0fdf4,stroke:#22c55e
+    style PG fill:#fef2f2,stroke:#ef4444
 ```
 
 ### Luồng 4: Admin - Crawl & Ingest
 
-```
-Admin chọn URL / Upload document
-    → Internet Crawler (tải nội dung)
-        → Text Cleaning (làm sạch)
-            → Source Policy Check (đánh giá độ tin cậy nguồn)
-                → Document Chunking (chia nhỏ)
-                    → Embedding Generation
-                        → Lưu vào Vector DB (ChromaDB)
+```mermaid
+graph TD
+    Input["Admin chọn URL / Upload document"] --> API["FastAPI Backend (Tiếp nhận request)"]
+    API --> Crawl["Internet Crawler (Tải nội dung)"]
+    Crawl --> Clean["Text Cleaning (Làm sạch)"]
+    Clean --> Policy["Source Policy Check (Đánh giá độ tin cậy nguồn)"]
+    Policy --> Chunk["Document Chunking (Chia nhỏ)"]
+    Chunk --> Embed["Embedding Generation"]
+    Embed --> DB[("Lưu vào Vector DB (ChromaDB)")]
+
+    style Input fill:#fef3c7,stroke:#f59e0b
+    style API fill:#eff6ff,stroke:#3b82f6
+    style Crawl fill:#f0fdf4,stroke:#22c55e
+    style Clean fill:#f0fdf4,stroke:#22c55e
+    style Policy fill:#fef2f2,stroke:#ef4444
+    style Chunk fill:#f0fdf4,stroke:#22c55e
+    style Embed fill:#f0fdf4,stroke:#22c55e
+    style DB fill:#f5f3ff,stroke:#8b5cf6
 ```
 
 ## 🔍 Chi tiết các Module trong Luồng

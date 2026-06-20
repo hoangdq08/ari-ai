@@ -178,8 +178,7 @@ ari_ai/
 │   └── bao-cao/
 │
 ├── docker-compose.yml          # Docker Compose configuration
-├── Makefile                    # Make commands for dev workflow
-├── start.sh                    # One-click startup script
+├── Makefile                    # Các lệnh tiện ích tự động (start, docker, install)
 ├── .env.example                # Environment variables template
 └── TODO.md                     # Lộ trình phát triển
 ```
