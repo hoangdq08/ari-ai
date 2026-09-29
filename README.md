@@ -2,7 +2,8 @@
 
 <p align="center">
   <strong>AI-powered agricultural assistant for Vietnamese farmers</strong><br>
-  Chat · Diagnostics · Handbook · AI Trust & Governance
+  Chat · Diagnostics · Handbook · AI Trust & Governance<br>
+  <sub>Đồ án môn AI002.F21.CN1.TTNT, Tư duy Trí tuệ nhân tạo · Giảng viên: TS. Phan Thế Duy · Trường ĐH Công nghệ Thông tin (UIT), ĐHQG-HCM</sub>
 </p>
 
 ---
